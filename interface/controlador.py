@@ -1,0 +1,1 @@
+# controlador intermediário entre a interface e os serviços. é sua única responsabilidade, seguindo o padrão SRP

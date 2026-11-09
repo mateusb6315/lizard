@@ -1,0 +1,1 @@
+# componentes de texto utilizados na interface do usuário

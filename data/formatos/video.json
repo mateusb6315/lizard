@@ -1,0 +1,477 @@
+{
+  "mp4": {
+    "extension": "mp4",
+    "video": {
+      "copy": [
+        "h264",
+        "h265",
+        "hevc",
+        "mpeg4",
+        "av1"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "ac3",
+        "alac"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "mkv": {
+    "extension": "mkv",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "vp8",
+        "vp9",
+        "av1",
+        "mpeg4",
+        "mpeg2video",
+        "theora",
+        "prores"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "ac3",
+        "eac3",
+        "dts",
+        "flac",
+        "opus",
+        "vorbis",
+        "pcm_s16le"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "mov": {
+    "extension": "mov",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "prores",
+        "mpeg4",
+        "mjpeg"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "alac",
+        "ac3",
+        "pcm_s16le"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "avi": {
+    "extension": "avi",
+    "video": {
+      "copy": [
+        "mpeg4",
+        "mpeg2video",
+        "mjpeg",
+        "h264"
+      ],
+      "encode": [
+        "mpeg4"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "mp3",
+        "ac3",
+        "pcm_s16le"
+      ],
+      "encode": [
+        "libmp3lame"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "webm": {
+    "extension": "webm",
+    "video": {
+      "copy": [
+        "vp8",
+        "vp9",
+        "av1"
+      ],
+      "encode": [
+        "libvpx-vp9"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "opus",
+        "vorbis"
+      ],
+      "encode": [
+        "libopus"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "wmv": {
+    "extension": "wmv",
+    "video": {
+      "copy": [
+        "wmv1",
+        "wmv2",
+        "vc1"
+      ],
+      "encode": [
+        "wmv2"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "wmav1",
+        "wmav2",
+        "mp3"
+      ],
+      "encode": [
+        "wmav2"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "asf": {
+    "extension": "asf",
+    "video": {
+      "copy": [
+        "wmv1",
+        "wmv2",
+        "vc1"
+      ],
+      "encode": [
+        "wmv2"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "wmav1",
+        "wmav2",
+        "mp3"
+      ],
+      "encode": [
+        "wmav2"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "flv": {
+    "extension": "flv",
+    "video": {
+      "copy": [
+        "flv1",
+        "h264"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "adpcm_swf"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "mpeg": {
+    "extension": "mpeg",
+    "video": {
+      "copy": [
+        "mpeg1video",
+        "mpeg2video"
+      ],
+      "encode": [
+        "mpeg2video"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "mp2",
+        "mp3",
+        "ac3"
+      ],
+      "encode": [
+        "mp2"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "mpg": {
+    "extension": "mpg",
+    "video": {
+      "copy": [
+        "mpeg1video",
+        "mpeg2video"
+      ],
+      "encode": [
+        "mpeg2video"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "mp2",
+        "mp3",
+        "ac3"
+      ],
+      "encode": [
+        "mp2"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "m4v": {
+    "extension": "m4v",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "mpeg4"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "ac3"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "3gp": {
+    "extension": "3gp",
+    "video": {
+      "copy": [
+        "h263",
+        "mpeg4",
+        "h264"
+      ],
+      "encode": [
+        "h263"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "amr_nb",
+        "amr_wb"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "ts": {
+    "extension": "ts",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "mpeg2video"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "ac3",
+        "eac3",
+        "mp2"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "mts": {
+    "extension": "mts",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "mpeg2video"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "ac3",
+        "eac3",
+        "mp2"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "m2ts": {
+    "extension": "m2ts",
+    "video": {
+      "copy": [
+        "h264",
+        "hevc",
+        "mpeg2video"
+      ],
+      "encode": [
+        "libx264"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "aac",
+        "ac3",
+        "eac3",
+        "mp2"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "ogv": {
+    "extension": "ogv",
+    "video": {
+      "copy": [
+        "theora"
+      ],
+      "encode": [
+        "libtheora"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "vorbis",
+        "opus"
+      ],
+      "encode": [
+        "libvorbis"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  },
+  "vob": {
+    "extension": "vob",
+    "video": {
+      "copy": [
+        "mpeg1video",
+        "mpeg2video"
+      ],
+      "encode": [
+        "mpeg2video"
+      ]
+    },
+    "audio": {
+      "copy": [
+        "ac3",
+        "mp2",
+        "dts",
+        "pcm_dvd"
+      ],
+      "encode": [
+        "ac3"
+      ],
+      "args": [
+        "-b:a",
+        "128k"
+      ]
+    }
+  }
+}

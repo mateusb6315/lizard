@@ -1,0 +1,224 @@
+{
+  "mp3": {
+    "extension": "mp3",
+    "audio": {
+      "copy": [
+        "mp3",
+        "aac"
+      ],
+      "encode": [
+        "libmp3lame"
+      ],
+      "args": [
+        "-q:a",
+        "2"
+      ]
+    }
+  },
+  "wav": {
+    "extension": "wav",
+    "audio": {
+      "copy": [
+        "pcm_u8",
+        "pcm_s16le",
+        "pcm_s24le",
+        "pcm_s32le",
+        "pcm_f32le",
+        "pcm_f64le",
+        "pcm_alaw",
+        "pcm_mulaw"
+      ],
+      "encode": [
+        "pcm_s24le"
+      ],
+      "args": []
+    }
+  },
+  "flac": {
+    "extension": "flac",
+    "audio": {
+      "copy": [
+        "flac"
+      ],
+      "encode": [
+        "flac"
+      ],
+      "args": []
+    }
+  },
+  "m4a": {
+    "extension": "m4a",
+    "audio": {
+      "copy": [
+        "aac",
+        "alac"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "256k"
+      ]
+    }
+  },
+  "aac": {
+    "extension": "aac",
+    "audio": {
+      "copy": [
+        "aac"
+      ],
+      "encode": [
+        "aac"
+      ],
+      "args": [
+        "-b:a",
+        "256k"
+      ]
+    }
+  },
+  "ogg": {
+    "extension": "ogg",
+    "audio": {
+      "copy": [
+        "vorbis",
+        "opus"
+      ],
+      "encode": [
+        "libvorbis"
+      ],
+      "args": [
+        "-q:a",
+        "6"
+      ]
+    }
+  },
+  "opus": {
+    "extension": "opus",
+    "audio": {
+      "copy": [
+        "opus"
+      ],
+      "encode": [
+        "libopus"
+      ],
+      "args": [
+        "-b:a",
+        "160k"
+      ]
+    }
+  },
+  "aiff": {
+    "extension": "aiff",
+    "audio": {
+      "copy": [
+        "pcm_s16be",
+        "pcm_s24be",
+        "pcm_s32be",
+        "pcm_f32be",
+        "pcm_f64be"
+      ],
+      "encode": [
+        "pcm_s24be"
+      ],
+      "args": []
+    }
+  },
+  "wma": {
+    "extension": "wma",
+    "audio": {
+      "copy": [
+        "wmav1",
+        "wmav2"
+      ],
+      "encode": [
+        "wmav2"
+      ],
+      "args": [
+        "-b:a",
+        "192k"
+      ]
+    }
+  },
+  "ac3": {
+    "extension": "ac3",
+    "audio": {
+      "copy": [
+        "ac3"
+      ],
+      "encode": [
+        "ac3"
+      ],
+      "args": [
+        "-b:a",
+        "384k"
+      ]
+    }
+  },
+  "mp2": {
+    "extension": "mp2",
+    "audio": {
+      "copy": [
+        "mp2"
+      ],
+      "encode": [
+        "mp2"
+      ],
+      "args": [
+        "-b:a",
+        "256k"
+      ]
+    }
+  },
+  "mka": {
+    "extension": "mka",
+    "audio": {
+      "copy": [
+        "aac",
+        "mp3",
+        "ac3",
+        "eac3",
+        "dts",
+        "flac",
+        "opus",
+        "vorbis",
+        "alac",
+        "pcm_s16le",
+        "pcm_s24le"
+      ],
+      "encode": [
+        "flac"
+      ],
+      "args": []
+    }
+  },
+  "wv": {
+    "extension": "wv",
+    "audio": {
+      "copy": [
+        "wavpack"
+      ],
+      "encode": [
+        "wavpack"
+      ],
+      "args": []
+    }
+  },
+  "caf": {
+    "extension": "caf",
+    "audio": {
+      "copy": [
+        "pcm_s16le",
+        "pcm_s24le",
+        "pcm_s32le",
+        "pcm_f32le",
+        "pcm_f64le",
+        "alac"
+      ],
+      "encode": [
+        "alac"
+      ],
+      "args": []
+    }
+  }
+}
