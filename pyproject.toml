@@ -1,13 +1,14 @@
 [project]
-name = "projeto-blackberry"
+name = "lizardconverter"
 version = "0.1.0"
-description = ""
+description = "Conversor local de áudio e vídeo com interface PyQt6"
 authors = [
     {name = "Your Name",email = "you@example.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "PyQt6>=6.8,<7",
 ]
 
 

@@ -1,6 +1,6 @@
-# AGENTS.md — Projeto Blackberry
+# AGENTS.md — LizardConverter
 
-> Instruções para agentes de desenvolvimento. O repositório e seus comentários são a fonte primária para compreender o estado atual. Leia `docs/ARCHITECTURE.md` e `docs/ROADMAP.md` de acordo com a tarefa.
+> Instruções para agentes de desenvolvimento. O repositório e seus comentários são a fonte primária para compreender o estado atual. Consulte `MEMORY.md` para decisões do projeto e os documentos locais em `docs/` quando estiverem disponíveis.
 
 ## 1. Prioridade absoluta: continuar o protótipo existente
 
@@ -25,11 +25,11 @@
 - `interface/componentes.py`: componentes visuais da interface PyQt6.
 - `interface/textos.py`: textos utilizados na interface.
 - `interface/controlador.py`: intermediário entre eventos/componentes visuais e serviços, conforme seu comentário de SRP; não processa mídia nem monta comandos FFmpeg.
-- `services/formatos.py`: carrega e disponibiliza os JSONs de `data/formatos/`; não decide copy/transcode nem executa FFmpeg.
+- `services/metadados.py`: carrega e disponibiliza os JSONs de `data/formatos/`; não decide copy/transcode nem executa FFmpeg.
 - `services/conversor.py`: inspeciona os arquivos (FFprobe), determina a estratégia permitida, monta argumentos e executa FFmpeg. Não contém widgets Qt.
 - `data/formatos/video.json` e `audio.json`: catálogos declarativos existentes; são dados/propostas de compatibilidade, **não garantias técnicas**.
-- `tools/`: destino reservado a FFmpeg e FFprobe portáteis; atualmente vazio. **Não assuma que os executáveis já existem.**
-- `main.py`: ponto de entrada futuro, atualmente vazio. `tests/`, `scripts/` e `changelog/` estão reservados, sem obrigação de preenchimento artificial.
+- `tools/`: destino de FFmpeg e FFprobe portáteis. Verifique a presença e a procedência dos executáveis.
+- `main.py`: ponto de entrada da interface. `tests/` contém as verificações e `scripts/` contém o empacotamento para Windows.
 
 ## 4. Regras de qualidade de mídia
 
@@ -46,13 +46,13 @@
 ## 5. Trabalho com os catálogos
 
 - Preserve o esquema atual por padrão: entradas por nome de formato; `extension`; blocos `video`/`audio`; campos `copy`, `encode` (atualmente **listas**) e `args` quando aplicável.
-- A função `carregar_formatos()` já foi iniciada em `services/formatos.py`: conclua-a antes de inventar um segundo carregador. Use `json` e `pathlib` da biblioteca padrão e trate arquivos ausentes/JSON malformado de maneira compreensível.
+- Reutilize `carregar_formatos()` em `services/metadados.py`. Use `json` e `pathlib` da biblioteca padrão e trate arquivos ausentes e JSON malformado de maneira compreensível.
 - Qualquer correção de codec, alias, parâmetro ou regra de compatibilidade deve ser **explícita, localizada e testada**, não uma reescrita generalizada. Registre mudanças que alterem o comportamento de saída.
 - Se uma decisão estiver indefinida (múltiplos áudios, legendas, perfis, presets), implemente apenas o escopo acordado e documente os limites.
 
 ## 6. Fluxo mínimo para cada tarefa
 
-1. Ler a tarefa, os arquivos afetados, seus comentários e a seção relevante de `docs/ARCHITECTURE.md`; conferir `docs/ROADMAP.md`.
+1. Ler a tarefa, os arquivos afetados, seus comentários e `MEMORY.md`. Conferir as seções relevantes de `docs/ARCHITECTURE.md` e `docs/ROADMAP.md` quando esses arquivos locais estiverem disponíveis.
 2. Identificar o que já existe, o que está incompleto e o que de fato precisa mudar.
 3. Para alterações maiores, apresentar um plano curto; não ampliar escopo por iniciativa própria.
 4. Implementar a **menor alteração coerente**. Não apagar nem reformatar código sem motivo.
@@ -63,7 +63,7 @@
 ## 7. Dependências e binários
 
 - O protótipo usa Python, PyQt6 e executáveis **FFmpeg/FFprobe locais** em `tools/`; o ambiente-alvo e o empacotamento final ainda não estão definidos.
-- A obtenção dos binários é uma **tarefa futura específica**. Não pressupor um caminho, plataforma, build ou versão. Quando autorizada, escolher fonte confiável para o sistema-alvo, verificar licença, proveniência, integridade, versão e recursos/encoders disponíveis; documentar a origem. Não baixar executáveis arbitrários nem misturá-los ao código de negócio.
+- `tools/ORIGEM.md` registra a build de Windows x64 usada no empacotamento e os hashes esperados. Em uma substituição autorizada, verificar licença, procedência, integridade, versão e encoders disponíveis e atualizar o registro.
 - Não criar testes que dependam dos binários sem possibilidade de pular/assinalar a ausência deles de maneira clara.
 
 ## 8. Autoridade das informações

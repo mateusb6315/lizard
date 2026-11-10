@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from services.formatos import METADADOS, carregar_formatos
+from services.metadados import METADADOS, carregar_formatos
 
 
 class TestCarregarFormatos(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestCarregarFormatos(unittest.TestCase):
 
     def test_catalogo_ausente_identifica_o_arquivo(self):
         with tempfile.TemporaryDirectory() as pasta:
-            with patch("services.formatos.METADADOS", Path(pasta)):
+            with patch("services.metadados.METADADOS", Path(pasta)):
                 with self.assertRaisesRegex(FileNotFoundError, r"ausente: .*video\.json"):
                     carregar_formatos()
 
@@ -42,7 +42,7 @@ class TestCarregarFormatos(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta)
             (caminho / "video.json").write_text("{", encoding="utf-8")
-            with patch("services.formatos.METADADOS", caminho):
+            with patch("services.metadados.METADADOS", caminho):
                 with self.assertRaisesRegex(ValueError, r"video\.json: JSON inválido na linha 1, coluna 2"):
                     carregar_formatos()
 
@@ -50,7 +50,7 @@ class TestCarregarFormatos(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta)
             (caminho / "video.json").write_bytes(b"\xff")
-            with patch("services.formatos.METADADOS", caminho):
+            with patch("services.metadados.METADADOS", caminho):
                 with self.assertRaisesRegex(ValueError, r"video\.json: conteúdo inválido em UTF-8"):
                     carregar_formatos()
 
@@ -69,7 +69,7 @@ class TestCarregarFormatos(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta)
             (caminho / "video.json").write_bytes((METADADOS / "video.json").read_bytes())
-            with patch("services.formatos.METADADOS", caminho):
+            with patch("services.metadados.METADADOS", caminho):
                 for catalogo, erro in casos:
                     with self.subTest(catalogo=catalogo):
                         (caminho / "audio.json").write_text(json.dumps(catalogo), encoding="utf-8")

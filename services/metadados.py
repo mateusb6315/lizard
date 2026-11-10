@@ -1,9 +1,14 @@
 # recupera os metadados dos formatos e fornece para conversor.py
 
 import json
+import sys
 from pathlib import Path
 
-METADADOS = Path(__file__).resolve().parent.parent / "data" / "formatos"
+if getattr(sys, "frozen", False):
+    RAIZ = Path(sys.executable).resolve().parent
+else:
+    RAIZ = Path(__file__).resolve().parents[1]
+METADADOS = RAIZ / "data" / "formatos"
 
 
 def carregar_formatos():

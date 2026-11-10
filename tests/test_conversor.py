@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from services import conversor
-from services.formatos import carregar_formatos
+from services.metadados import carregar_formatos
 
 
 class TestConversor(unittest.TestCase):
