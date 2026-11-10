@@ -18,6 +18,12 @@ RAIZ = Path(__file__).resolve().parent.parent
 PRODUTO = "LizardConverter"
 EXECUTAVEL = "Lizard"
 ICONE = RAIZ / "resources" / "lizard.ico"
+PASTA_FFMPEG = "tools/ffmpeg"
+BINARIOS_FFMPEG = (
+    "ffmpeg.exe", "ffprobe.exe", "avcodec-63.dll", "avdevice-63.dll",
+    "avfilter-12.dll", "avformat-63.dll", "avutil-61.dll", "swresample-7.dll",
+    "swscale-10.dll",
+)
 RECURSOS = (
     "data/formatos/audio.json",
     "data/formatos/video.json",
@@ -28,10 +34,8 @@ RECURSOS = (
     "resources/sun.svg",
     "resources/moon.svg",
     "resources/LICENSE-Lucide.txt",
-    "tools/ffmpeg.exe",
-    "tools/ffprobe.exe",
-    "tools/LICENSE",
-    "tools/ORIGEM.md",
+) + tuple(
+    f"{PASTA_FFMPEG}/{nome}" for nome in (*BINARIOS_FFMPEG, "LICENSE", "COPYING.LGPLv3", "ORIGEM.md")
 )
 DEPENDENCIAS = ("PyInstaller", "PyQt6", "PyQt6-Qt6", "PyQt6-sip")
 
@@ -59,7 +63,7 @@ def _ambiente(staging):
 def _validar_pacote(pacote, ambiente, cwd):
     versoes = {}
     for ferramenta in ("ffmpeg", "ffprobe"):
-        comando = [str(pacote / "tools" / f"{ferramenta}.exe"), "-version"]
+        comando = [str(pacote / PASTA_FFMPEG / f"{ferramenta}.exe"), "-version"]
         resultado = subprocess.run(
             comando, cwd=cwd, env=ambiente, timeout=15, check=True,
             capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -91,12 +95,12 @@ def compilar(versao, canal):
         if not (RAIZ / recurso).is_file():
             raise FileNotFoundError(f"Recurso obrigatório ausente: {recurso}")
 
-    origem = (RAIZ / "tools" / "ORIGEM.md").read_text(encoding="utf-8")
+    origem = (RAIZ / PASTA_FFMPEG / "ORIGEM.md").read_text(encoding="utf-8")
     hashes = {recurso: _sha256(RAIZ / recurso) for recurso in RECURSOS}
-    for ferramenta in ("ffmpeg.exe", "ffprobe.exe"):
+    for ferramenta in BINARIOS_FFMPEG:
         esperado = re.search(rf"SHA-256 de {re.escape(ferramenta)}: `([0-9a-f]{{64}})`", origem)
-        if esperado is None or hashes[f"tools/{ferramenta}"] != esperado[1]:
-            raise ValueError(f"SHA-256 de {ferramenta} diverge do registro em tools/ORIGEM.md.")
+        if esperado is None or hashes[f"{PASTA_FFMPEG}/{ferramenta}"] != esperado[1]:
+            raise ValueError(f"SHA-256 de {ferramenta} diverge do registro em {PASTA_FFMPEG}/ORIGEM.md.")
 
     # Preserve o rótulo no manifesto e adapte apenas o nome da pasta ao Windows.
     rotulo = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", versao)[:80].strip().rstrip(". ")

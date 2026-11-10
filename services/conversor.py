@@ -4,11 +4,18 @@ from services.metadados import carregar_formatos
 import json
 import subprocess
 import os
+import re
 import tempfile
 import warnings
 from pathlib import Path
 
 formatos = carregar_formatos()
+
+
+def caminhos_ferramentas(pasta_tools):
+    pasta = Path(pasta_tools) / "ffmpeg"
+    sufixo = ".exe" if os.name == "nt" else ""
+    return pasta / f"ffmpeg{sufixo}", pasta / f"ffprobe{sufixo}"
 
 
 class ConversaoCancelada(Exception):
@@ -93,7 +100,7 @@ def converter(
     """Converte streams selecionados por índice, com ações 'copiar' ou 'recodificar'.
 
     Com acoes=None, seleciona áudio e, para saída de vídeo, vídeo sem capas.
-    A recodificação usa o primeiro encoder, sem aplicar argumentos de qualidade.
+    A recodificação usa o primeiro encoder disponível do perfil.
     """
     entrada = Path(entrada)
     saida = Path(saida)
@@ -134,6 +141,7 @@ def converter(
         comando.extend(["-map", f"0:{item['index']}"])
 
     with tempfile.TemporaryDirectory(dir=saida.parent, prefix=".blackberry-") as pasta:
+        encoders_disponiveis = None
         if informar_etapa:
             informar_etapa("planejamento")
         for posicao, item in enumerate(plano):
@@ -174,7 +182,15 @@ def converter(
                 encoders = perfil[item["tipo"]]["encode"]
                 if not encoders:
                     raise ValueError(f"Nenhum encoder no perfil para {item['tipo']}")
-                codec = encoders[0]
+                if encoders_disponiveis is None:
+                    try:
+                        lista = _executar([str(ffmpeg), "-hide_banner", "-encoders"], cancelamento)
+                    except subprocess.CalledProcessError as erro:
+                        raise RuntimeError(f"Falha ao consultar encoders: {erro.stderr.strip()}") from erro
+                    encoders_disponiveis = set(re.findall(r"^\s+[VAS][.A-Z]{5}\s+(\S+)", lista.stdout, re.M))
+                codec = next((nome for nome in encoders if nome in encoders_disponiveis), None)
+                if codec is None:
+                    raise ValueError(f"Encoders indisponíveis para {item['tipo']}: {', '.join(encoders)}")
             else:
                 raise ValueError(f"Ação inválida para stream {item['index']}: {acao}")
             comando.extend([f"-c:{posicao}", codec])

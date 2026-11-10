@@ -18,5 +18,5 @@ O nome comercial é **LizardConverter**. O build portátil para Windows x64 entr
 
 - `scripts/compilar.py` e `scripts/beta.py` compartilham a configuração PyInstaller. A estrutura do pacote é `Lizard.exe` ao lado de `lib/`, `data/`, `tools/`, `resources/`, `license/` e `build.json`.
 - `resources/lizard.ico` deriva de `resources/logo_dark.png` e é incorporado ao executável durante o build. A logo em PNG continua disponível para a interface.
-- Os binários de mídia ficam em `tools/`. `tools/ORIGEM.md` registra a origem e os hashes usados na validação do build.
+- Os binários de mídia e suas DLLs ficam em `tools/ffmpeg/`. `tools/ffmpeg/ORIGEM.md` registra a origem e os hashes usados na validação do build.
 - Execute `python -B -m unittest discover -s tests -v` no ambiente com PyQt6. Os testes de mídia que exigem FFmpeg e FFprobe locais são pulados quando os executáveis estão ausentes.

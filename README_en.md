@@ -57,12 +57,12 @@ Move the entire `LizardConverter` folder when relocating the app. The executable
 | Environment | What you need |
 | --- | --- |
 | Portable package | Windows x64, the complete app folder, and write access to the output folder. Python, Qt, FFmpeg, and FFprobe are included. |
-| Running from source | Python 3.13 or later, PyQt6, and the `tools/ffmpeg.exe` and `tools/ffprobe.exe` executables on Windows. |
+| Running from source | Python 3.13 or later, PyQt6, and the `tools/ffmpeg/ffmpeg.exe` and `tools/ffmpeg/ffprobe.exe` executables on Windows. |
 | Packaging | Python x64 on Windows, PyQt6, PyInstaller, and the binaries that match the hashes recorded by the project. |
 
 PyQt6 provides the graphical interface. FFprobe identifies streams, media types, and codecs. FFmpeg reads the file and generates the output. PyInstaller bundles the runtime and dependencies into the Windows package and is only needed when building that package.
 
-When running from source, place the executables in `tools/` at the project root. In the portable package, this folder is next to `Lizard.exe`. To prepare a build, use binaries whose hashes match the project record. [FFmpeg and FFprobe provenance](tools/ORIGEM.md)
+When running from source, place the executables and DLLs in `tools/ffmpeg/` at the project root. In the portable package, `tools/ffmpeg/` is under the folder containing `Lizard.exe`. To prepare a build, use binaries whose hashes match the project record. [FFmpeg and FFprobe provenance](tools/ffmpeg/ORIGEM.md)
 
 ## Code and structure
 
@@ -84,7 +84,7 @@ When running from source, place the executables in `tools/` at the project root.
 
 ### Run from source
 
-At the project root, prepare the binaries in `tools/` according to the provenance record. Use PowerShell to create the environment and open the app. [Binary provenance](tools/ORIGEM.md)
+At the project root, prepare the binaries and DLLs in `tools/ffmpeg/` according to the provenance record. Use PowerShell to create the environment and open the app. [Binary provenance](tools/ffmpeg/ORIGEM.md)
 
 ```powershell
 python -m venv .venv
@@ -121,7 +121,7 @@ Media processing takes place on your computer. In the portable package, the them
 
 The LizardConverter code and documentation are available under the **MIT License**. It allows use, modification, and redistribution as long as the copyright notice and license text are retained in copies or substantial portions. [Project license](LICENSE) · [MIT License text](https://opensource.org/license/mit)
 
-Third-party components follow their own terms. The FFmpeg and FFprobe build used by the project comes with the GPLv3. The sun and moon icons come with the Lucide license. Notices collected for PyQt6 and its dependencies are in `license/` in the portable package. [Binary license](tools/LICENSE) · [Icon license](resources/LICENSE-Lucide.txt) · [PyQt licensing](https://www.riverbankcomputing.com/software/pyqt/)
+Third-party components follow their own terms. The FFmpeg and FFprobe build used by the project comes with the LGPLv3. The sun and moon icons come with the Lucide license. Notices collected for PyQt6 and its dependencies are in `license/` in the portable package. [Binary license](tools/ffmpeg/COPYING.LGPLv3) · [Icon license](resources/LICENSE-Lucide.txt) · [PyQt licensing](https://www.riverbankcomputing.com/software/pyqt/)
 
 To contribute, submit a pull request describing the purpose of the change and how to verify it. For conversion changes, include the input and output formats used in testing and a sample you can share. For documentation changes, review both README versions. Run the test suite from the project root before submitting.
 

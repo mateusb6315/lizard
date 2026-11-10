@@ -1,6 +1,5 @@
 # controlador intermediário entre a interface e os serviços. é sua única responsabilidade, seguindo o padrão SRP
 
-import os
 import json
 from pathlib import Path
 from threading import Event
@@ -41,9 +40,7 @@ class Controlador(QObject):
         super().__init__(janela)
         self.janela = janela
         self.preferencias = preferencias
-        sufixo = ".exe" if os.name == "nt" else ""
-        self.ffmpeg = ferramentas / f"ffmpeg{sufixo}"
-        self.ffprobe = ferramentas / f"ffprobe{sufixo}"
+        self.ffmpeg, self.ffprobe = conversor.caminhos_ferramentas(ferramentas)
         self.entrada = None
         self.tarefa = None
         self.progresso = None

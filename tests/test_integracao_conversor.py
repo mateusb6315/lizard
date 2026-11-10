@@ -5,13 +5,14 @@ import unittest
 from pathlib import Path
 from threading import Event, Timer
 
-from services.conversor import ConversaoCancelada, _executar, converter, inspecionar_arquivo
+from services.conversor import (
+    ConversaoCancelada, _executar, caminhos_ferramentas, converter, inspecionar_arquivo,
+)
 from services.metadados import carregar_formatos
 
 
 RAIZ = Path(__file__).resolve().parent.parent
-FFMPEG = RAIZ / "tools" / "ffmpeg.exe"
-FFPROBE = RAIZ / "tools" / "ffprobe.exe"
+FFMPEG, FFPROBE = caminhos_ferramentas(RAIZ / "tools")
 
 
 class TestCancelamento(unittest.TestCase):
@@ -54,6 +55,9 @@ class TestIntegracaoConversor(unittest.TestCase):
             self.assertEqual([(s["codec_type"], s["codec_name"]) for s in streams],
                              [("video", "mpeg4"), ("audio", "aac"), ("audio", "aac")])
             self.assertEqual(etapas, ["inspecao", "planejamento", "conversao", "validacao"])
+            h264 = pasta / "recodificado.mp4"
+            converter(entrada, h264, "video", "mp4", {0: "recodificar"}, FFMPEG, FFPROBE)
+            self.assertEqual(inspecionar_arquivo(h264, FFPROBE)[0]["codec_name"], "h264")
             cancelar = Event()
             cancelada = pasta / "cancelada.mp4"
             with self.assertRaises(ConversaoCancelada):

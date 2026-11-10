@@ -63,7 +63,7 @@
 ## 7. Dependências e binários
 
 - O protótipo usa Python, PyQt6 e executáveis **FFmpeg/FFprobe locais** em `tools/`; o ambiente-alvo e o empacotamento final ainda não estão definidos.
-- `tools/ORIGEM.md` registra a build de Windows x64 usada no empacotamento e os hashes esperados. Em uma substituição autorizada, verificar licença, procedência, integridade, versão e encoders disponíveis e atualizar o registro.
+- `tools/ffmpeg/ORIGEM.md` registra a build de Windows x64 usada no empacotamento e os hashes esperados. Em uma substituição autorizada, verificar licença, procedência, integridade, versão e encoders disponíveis e atualizar o registro.
 - Não criar testes que dependam dos binários sem possibilidade de pular/assinalar a ausência deles de maneira clara.
 
 ## 8. Autoridade das informações

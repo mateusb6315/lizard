@@ -57,12 +57,12 @@ Ao mover o aplicativo para outro local, leve a pasta `LizardConverter` inteira. 
 | Ambiente | O que você precisa |
 | --- | --- |
 | Pacote portátil | Windows x64, a pasta completa do aplicativo e acesso de gravação à pasta de saída. Python, Qt, FFmpeg e FFprobe já acompanham o pacote. |
-| Execução pelo código-fonte | Python 3.13 ou superior, PyQt6 e os executáveis `tools/ffmpeg.exe` e `tools/ffprobe.exe` no Windows. |
+| Execução pelo código-fonte | Python 3.13 ou superior, PyQt6 e os executáveis `tools/ffmpeg/ffmpeg.exe` e `tools/ffmpeg/ffprobe.exe` no Windows. |
 | Empacotamento | Python x64 no Windows, PyQt6, PyInstaller e os binários conferidos pelos hashes registrados pelo projeto. |
 
 O PyQt6 fornece a interface gráfica. O FFprobe identifica as faixas, os tipos de mídia e os codecs. O FFmpeg lê o arquivo e gera a saída. O PyInstaller reúne o runtime e as dependências no pacote Windows e só é necessário para gerar esse pacote.
 
-Na execução pelo código-fonte, coloque os executáveis em `tools/` na raiz do projeto. No pacote portátil, essa pasta fica ao lado de `Lizard.exe`. Para preparar um build, use os binários cujos hashes correspondem ao registro do projeto. [Origem do FFmpeg e do FFprobe](tools/ORIGEM.md)
+Na execução pelo código-fonte, coloque os executáveis e as DLLs em `tools/ffmpeg/` na raiz do projeto. No pacote portátil, `tools/ffmpeg/` fica sob a pasta que contém `Lizard.exe`. Para preparar um build, use os binários cujos hashes correspondem ao registro do projeto. [Origem do FFmpeg e do FFprobe](tools/ffmpeg/ORIGEM.md)
 
 ## Código e estrutura
 
@@ -84,7 +84,7 @@ Na execução pelo código-fonte, coloque os executáveis em `tools/` na raiz do
 
 ### Executar pelo código-fonte
 
-Na raiz do projeto, prepare os binários em `tools/` conforme o registro de origem. Use o PowerShell para criar o ambiente e abrir o aplicativo. [Origem dos binários](tools/ORIGEM.md)
+Na raiz do projeto, prepare os binários e DLLs em `tools/ffmpeg/` conforme o registro de origem. Use o PowerShell para criar o ambiente e abrir o aplicativo. [Origem dos binários](tools/ffmpeg/ORIGEM.md)
 
 ```powershell
 python -m venv .venv
@@ -121,7 +121,7 @@ O processamento de mídia ocorre no computador. No pacote portátil, a preferên
 
 O código e a documentação do LizardConverter são disponibilizados sob a **Licença MIT**. Ela permite usar, modificar e redistribuir o material, desde que o aviso de copyright e o texto da licença sejam mantidos nas cópias ou partes substanciais. [Licença do projeto](LICENSE) · [Texto da Licença MIT](https://opensource.org/license/mit)
 
-Os componentes de terceiros seguem seus próprios termos. A build de FFmpeg e FFprobe usada no projeto acompanha a GPLv3. Os ícones de sol e lua acompanham a licença Lucide. Os avisos coletados do PyQt6 e de suas dependências ficam em `license/` no pacote portátil. [Licença dos binários](tools/LICENSE) · [Licença dos ícones](resources/LICENSE-Lucide.txt) · [Licenciamento do PyQt](https://www.riverbankcomputing.com/software/pyqt/)
+Os componentes de terceiros seguem seus próprios termos. A build de FFmpeg e FFprobe usada no projeto acompanha a LGPLv3. Os ícones de sol e lua acompanham a licença Lucide. Os avisos coletados do PyQt6 e de suas dependências ficam em `license/` no pacote portátil. [Licença dos binários](tools/ffmpeg/COPYING.LGPLv3) · [Licença dos ícones](resources/LICENSE-Lucide.txt) · [Licenciamento do PyQt](https://www.riverbankcomputing.com/software/pyqt/)
 
 Para contribuir, envie uma pull request com o objetivo da mudança e os passos para verificá-la. Se a alteração afetar a conversão, inclua os formatos de entrada e saída usados no teste e uma amostra que possa ser compartilhada. Se afetar a documentação, revise as duas versões do README. Rode a suíte na raiz do projeto antes de enviar.
 

@@ -10,7 +10,8 @@
         "av1"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -44,7 +45,8 @@
         "prores"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -79,7 +81,8 @@
         "mjpeg"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -215,7 +218,8 @@
         "h264"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -294,7 +298,8 @@
         "mpeg4"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -348,7 +353,8 @@
         "mpeg2video"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -376,7 +382,8 @@
         "mpeg2video"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
@@ -404,7 +411,8 @@
         "mpeg2video"
       ],
       "encode": [
-        "libx264"
+        "libx264",
+        "libopenh264"
       ]
     },
     "audio": {
