@@ -1,6 +1,6 @@
 # Memória do LizardConverter
 
-O nome comercial é **LizardConverter**. O build portátil para Windows x64 entrega a pasta `LizardConverter` e o executável `Lizard.exe`. A marca anterior, Blackberry, aparece no histórico do protótipo e em artefatos locais antigos.
+O nome comercial é **LizardConverter**. O build portátil para Windows x64 entrega `Lizard.exe` na pasta `lizard-converter-<versão>`. A marca anterior, Blackberry, aparece no histórico do protótipo e em artefatos locais antigos.
 
 ## Organização do código
 
@@ -16,7 +16,7 @@ O nome comercial é **LizardConverter**. O build portátil para Windows x64 entr
 
 ## Empacotamento e verificação
 
-- `scripts/compilar.py` e `scripts/beta.py` compartilham a configuração PyInstaller. A estrutura do pacote é `Lizard.exe` ao lado de `lib/`, `data/`, `tools/`, `resources/`, `license/` e `build.json`.
+- `scripts/compilar.py` e `scripts/beta.py` compartilham a configuração PyInstaller e publicam em `dist/release/` e `dist/beta/`, respectivamente. A pasta final só é criada após a validação em staging. Ela contém `Lizard.exe` ao lado de `lib/`, `data/`, `tools/`, `resources/`, `license/` e `build.json`.
 - `resources/lizard.ico` deriva de `resources/logo_dark.png` e é incorporado ao executável durante o build. A logo em PNG continua disponível para a interface.
 - Os binários de mídia e suas DLLs ficam em `tools/ffmpeg/`. `tools/ffmpeg/ORIGEM.md` registra a origem e os hashes usados na validação do build.
 - Execute `python -B -m unittest discover -s tests -v` no ambiente com PyQt6. Os testes de mídia que exigem FFmpeg e FFprobe locais são pulados quando os executáveis estão ausentes.

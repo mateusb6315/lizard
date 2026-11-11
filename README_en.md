@@ -44,13 +44,13 @@ Lizard inspects the input streams and evaluates whether each selected stream can
 
 ## Quick start
 
-1. Extract the portable `LizardConverter` folder to a writable location and open `Lizard.exe`.
+1. Extract the portable `lizard-converter-<version>` folder to a writable location and open `Lizard.exe`.
 2. Drag a media file into the window or choose **Arquivo → Abrir** (File → Open). The name displayed in the window identifies the loaded file.
 3. Choose an output format in **Formato de saída**. To extract audio from an MP4 with a single audio stream, select **Audio — MP3**. Choose a video profile to keep the video.
 4. Click **Converter** (Convert) and choose a file name that does not already exist. The progress window shows the current stage and elapsed time. Use **Cancelar** (Cancel) to stop the operation.
 5. After the app confirms completion, open the file at the selected destination. In the MP3 example, the result contains only the audio stream.
 
-Move the entire `LizardConverter` folder when relocating the app. The executable uses the catalogs, libraries, and tools in the folders next to it.
+Move the entire portable folder when relocating the app. The executable uses the catalogs, libraries, and tools in the folders next to it.
 
 ## Requirements and tools
 
@@ -99,7 +99,9 @@ python -m venv .venv
 .\.venv\Scripts\python.exe scripts/compilar.py
 ```
 
-With the default label, the executable is at `dist/producao/build-local-win64/LizardConverter/Lizard.exe`. The script verifies the binary hashes, tests startup, and collects dependencies in `lib/`. The catalogs, tools, and visual assets go in `data/`, `tools/`, and `resources/`, respectively. License notices collected by the build script go in `license/`.
+After checking the requirements, the script asks for the version. To supply it on the command line, use `--versao "0.9 beta1"`. The executable is at `dist/release/lizard-converter-<version>/Lizard.exe`. The `scripts/beta.py` script follows the same process and writes to `dist/beta/`.
+
+The script verifies the binary hashes, tests startup, and collects dependencies in `lib/`. The catalogs, tools, and visual assets go in `data/`, `tools/`, and `resources/`, respectively. License notices go in `license/`. If PyInstaller fails, the script reports the log path in the channel directory.
 
 ## Lizard features
 

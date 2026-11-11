@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -73,6 +74,7 @@ def _validar_pacote(pacote, ambiente, cwd):
     ambiente_teste = {**ambiente, "QT_QPA_PLATFORM": "offscreen"}
     with subprocess.Popen(
         [str(pacote / f"{EXECUTAVEL}.exe")], cwd=cwd, env=ambiente_teste,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW,
     ) as processo:
         try:
@@ -85,12 +87,14 @@ def _validar_pacote(pacote, ambiente, cwd):
     return versoes
 
 
-def compilar(versao, canal):
+def _verificar_requisitos():
     if sys.platform != "win32" or platform.machine().upper() != "AMD64" or sys.maxsize <= 2**32:
         raise RuntimeError("Use Python x64 no Windows para empacotar os binários deste projeto.")
     dependencias = {nome: metadata.distribution(nome) for nome in DEPENDENCIAS}
     if not ICONE.is_file():
         raise FileNotFoundError(f"Ícone obrigatório ausente: {ICONE}")
+    if not os.environ.get("SystemRoot"):
+        raise RuntimeError("O ambiente de compilação precisa definir SystemRoot.")
     for recurso in RECURSOS:
         if not (RAIZ / recurso).is_file():
             raise FileNotFoundError(f"Recurso obrigatório ausente: {recurso}")
@@ -101,16 +105,31 @@ def compilar(versao, canal):
         esperado = re.search(rf"SHA-256 de {re.escape(ferramenta)}: `([0-9a-f]{{64}})`", origem)
         if esperado is None or hashes[f"{PASTA_FFMPEG}/{ferramenta}"] != esperado[1]:
             raise ValueError(f"SHA-256 de {ferramenta} diverge do registro em {PASTA_FFMPEG}/ORIGEM.md.")
+    return dependencias, hashes
 
-    # Preserve o rótulo no manifesto e adapte apenas o nome da pasta ao Windows.
-    rotulo = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", versao)[:80].strip().rstrip(". ")
-    destino = (RAIZ / "dist" / canal / f"build-{rotulo or 'local'}-win64").resolve()
+
+def _escolher_versao(versao, destino):
+    while True:
+        if versao is None:
+            versao = input("[script] Digite a versão: ")
+        versao = versao.strip()
+        final = destino / f"lizard-converter-{versao}"
+        if (versao and not re.search(r'[<>:"/\\|?*\x00-\x1f]', versao)
+                and not versao.endswith(".") and len(final.name.encode("utf-16-le")) <= 510
+                and not final.exists() and not final.is_symlink()):
+            print("[script] Versão validada. Continuando o processo...", flush=True)
+            return versao, final
+        print("[script] Versão inválida, digite novamente.", flush=True)
+        versao = None
+
+
+def compilar(versao, canal, final, dependencias, hashes):
+    destino = final.parent
     if not destino.is_relative_to(RAIZ):
         raise ValueError("A pasta de entrega precisa estar dentro do projeto.")
-    destino.mkdir(parents=True, exist_ok=True)
-    final = destino / PRODUTO
-    if final.exists():
+    if final.exists() or final.is_symlink():
         raise FileExistsError(f"Já existe um pacote em {final}.")
+    destino.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".build-", dir=destino) as pasta:
         staging = Path(pasta)
         ambiente = _ambiente(staging)
@@ -120,8 +139,22 @@ def compilar(versao, canal):
             "--distpath", str(staging / "dist"), "--workpath", str(staging / "work"),
             "--specpath", str(staging),
         ]
-        subprocess.run(comando + [str(RAIZ / "main.py")], cwd=RAIZ, env=ambiente, check=True)
+        try:
+            subprocess.run(
+                comando + [str(RAIZ / "main.py")], cwd=RAIZ, env=ambiente, check=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        except subprocess.CalledProcessError as erro:
+            with tempfile.NamedTemporaryFile(
+                prefix="compilacao-", suffix=".log", dir=destino, delete=False,
+            ) as log:
+                log.write(erro.stdout or b"")
+            raise RuntimeError(f"O PyInstaller falhou. Consulte o log em {log.name}.") from erro
         pacote = staging / "dist" / EXECUTAVEL
+        executavel = pacote / f"{EXECUTAVEL}.exe"
+        if not executavel.is_file() or executavel.stat().st_size == 0:
+            raise RuntimeError(f"O PyInstaller não gerou {executavel.name}.")
         for recurso, esperado in hashes.items():
             copia = pacote / recurso
             copia.parent.mkdir(parents=True, exist_ok=True)
@@ -156,28 +189,48 @@ def compilar(versao, canal):
         # No Windows, rename falha se outra compilação já publicou este destino.
         if not pacote.resolve().is_relative_to(destino) or final.parent != destino:
             raise ValueError("Os caminhos de publicação precisam estar na pasta de entrega.")
-        pacote.rename(final)
+        for tentativa in range(21):
+            try:
+                pacote.rename(final)
+                break
+            except PermissionError as erro:
+                if final.exists() or final.is_symlink():
+                    raise FileExistsError(f"Já existe um pacote em {final}.") from erro
+                if erro.winerror not in (5, 32) or tentativa == 20:
+                    raise
+                time.sleep(0.25)
     return final
 
 
-def main(canal="producao"):
+def main(canal="release"):
     parser = argparse.ArgumentParser(description=f"Empacota o {PRODUTO} localmente ({canal}).")
-    parser.add_argument("--versao", default="local", help="Rótulo livre do pacote (padrão: local).")
+    parser.add_argument("--versao", help="Rótulo livre do pacote. Se omitido, será solicitado.")
     versao = parser.parse_args().versao
 
     try:
-        pacote = compilar(versao, canal)
+        print("[script] Verificando requisitos...", flush=True)
+        dependencias, hashes = _verificar_requisitos()
+        destino = (RAIZ / "dist" / canal).resolve()
+        if not destino.is_relative_to(RAIZ):
+            raise ValueError("A pasta de entrega precisa estar dentro do projeto.")
+        versao, final = _escolher_versao(versao, destino)
+        print("[script] Fazendo a compilação...", flush=True)
+        pacote = compilar(versao, canal, final, dependencias, hashes)
     except metadata.PackageNotFoundError as erro:
-        print(f"Dependência ausente: {erro.name}. Instale PyQt6 e PyInstaller no ambiente de build.",
+        print(f"[script] Dependência ausente: {erro.name}. Instale PyQt6 e PyInstaller no ambiente de build.",
               file=sys.stderr)
         return 1
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as erro:
-        print(f"Falha na compilação: {erro}", file=sys.stderr)
+        print(f"[script] Falha na compilação: {erro}", file=sys.stderr)
+        return 1
+    except EOFError:
+        print("[script] Entrada encerrada. Informe a versão com --versao ou execute no terminal.", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
-        print("Compilação cancelada.", file=sys.stderr)
+        print("[script] Compilação cancelada.", file=sys.stderr)
         return 130
-    print(f"Pacote local gerado em {pacote}")
+    print(f"[script] Compilação concluída da versão {versao}")
+    print(f"[script] Local: {pacote}")
     return 0
 
 

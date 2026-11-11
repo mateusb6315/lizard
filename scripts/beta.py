@@ -1,4 +1,4 @@
-"""Gera um pacote beta local e separado do pacote de produção."""
+"""Gera um pacote beta local e separado do canal release."""
 
 import sys
 
