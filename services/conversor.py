@@ -2,17 +2,22 @@
 
 from services.metadados import carregar_formatos
 import json
+import logging
+import math
 import subprocess
 import os
 import re
 import tempfile
 import warnings
+from fractions import Fraction
 from pathlib import Path
 
+LOG = logging.getLogger("lizard")
 PERFIS_AUDIO_FAIXA_UNICA = frozenset({"mp3", "wav", "flac", "aac", "aiff", "ac3", "mp2", "wv", "caf"})
 PERFIS_COM_FAIXA_DE_CAPITULOS = frozenset({"mp4", "mov", "m4a", "m4v", "3gp"})
 ERRO_INICIO_H264 = re.compile(
-    r"\[h264 @ [0-9a-fA-F]+\] (?:non-existing PPS \d+ referenced|decode_slice_header error|no frame!)"
+    r"\[h264 @ [0-9a-fA-F]+\] (?:non-existing PPS \d+ referenced|sps_id \d+ out of range"
+    r"|decode_slice_header error|no frame!)"
     r"|Last message repeated \d+ times?"
 )
 ERRO_MUXER = re.compile(
@@ -35,6 +40,19 @@ ERRO_DE_LEITURA_OU_GRAVACAO = re.compile(
     r"|Invalid data found|No such file|Read-only file system",
     re.I,
 )
+ERRO_DECODER_LATM = re.compile(
+    r"\[aist#0:(\d+)/aac_latm @ [0-9a-fA-F]+\] \[dec:aac_latm @ [0-9a-fA-F]+\] "
+    r"(?:Error submitting packet to decoder|Error processing packet in decoder|"
+    r"Task finished with error|Terminating thread with error): Invalid data found when processing input"
+)
+PACOTE_CORROMPIDO_TS = re.compile(
+    r"^\[in#0/mpegts @ [0-9a-fA-F]+\] Packet corrupt \(stream = (\d+), dts = (-?\d+)\)\.$",
+    re.M,
+)
+PERDA_MAXIMA_TS = 1.0
+# A leitura adiantada do decoder pode alcançar um pacote defeituoso antes do fim solicitado.
+MARGEM_CORTE_TS = 0.20
+TOLERANCIA_TIMESTAMPS_TS = 0.12
 
 
 def __getattr__(nome):
@@ -83,14 +101,30 @@ def _executar(comando, cancelamento):
         return subprocess.CompletedProcess(comando, processo.returncode, stdout, stderr)
 
 
-def inspecionar_arquivo(arquivo, ffprobe, *, cancelamento=None, detalhes=False, recuperar_inicio_ts=False):
+def _diagnostico_inicio_h264(diagnostico):
+    return "non-existing PPS" in diagnostico and all(
+        ERRO_INICIO_H264.fullmatch(linha.strip()) for linha in diagnostico.splitlines()
+    )
+
+
+def _video_real(stream):
+    return stream.get("codec_type") == "video" and not stream.get("disposition", {}).get("attached_pic")
+
+
+def inspecionar_arquivo(
+    arquivo, ffprobe, *, cancelamento=None, detalhes=False, recuperar_inicio_ts=False, estimar_duracao=False,
+):
     """Consulta os streams e, opcionalmente, os metadados necessários à validação."""
     comando = [
         str(ffprobe), "-v", "error", "-protocol_whitelist", "file",
         "-show_streams",
     ]
+    if detalhes and not estimar_duracao:
+        comando.extend(["-skip_estimate_duration_from_pts", "1"])
+    if detalhes or recuperar_inicio_ts:
+        comando.append("-show_format")
     if detalhes:
-        comando.extend(["-skip_estimate_duration_from_pts", "1", "-show_format", "-show_chapters"])
+        comando.append("-show_chapters")
     comando.extend(["-of", "json", str(arquivo)])
     try:
         resultado = _executar(comando, cancelamento)
@@ -107,12 +141,15 @@ def inspecionar_arquivo(arquivo, ffprobe, *, cancelamento=None, detalhes=False, 
     if not isinstance(streams, list) or any(not isinstance(stream, dict) for stream in streams):
         raise ValueError("FFprobe retornou streams inválidos")
     if diagnostico:
-        formato = dados.get("format", {}).get("format_name")
+        metadados = dados.get("format")
         inicio_recuperavel = (
-            recuperar_inicio_ts and formato == "mpegts"
-            and "non-existing PPS" in diagnostico
-            and all(ERRO_INICIO_H264.fullmatch(linha.strip()) for linha in diagnostico.splitlines())
-            and any(s.get("codec_name") == "h264" and s.get("width") and s.get("height") for s in streams)
+            recuperar_inicio_ts and isinstance(metadados, dict) and metadados.get("format_name") == "mpegts"
+            and _diagnostico_inicio_h264(diagnostico)
+            and any(
+                _video_real(s) and s.get("codec_name") == "h264"
+                and all(type(s.get(campo)) is int and s[campo] > 0 for campo in ("width", "height", "extradata_size"))
+                for s in streams
+            )
         )
         if not inicio_recuperavel:
             raise RuntimeError(f"Falha ao inspecionar {arquivo}: {diagnostico}")
@@ -126,15 +163,28 @@ def planejar_conversao(streams, categoria, formato, indices, *, catalogos=None):
         catalogos = carregar_formatos()
     if formato not in catalogos.get(categoria, {}):
         raise ValueError(f"Formato desconhecido: {categoria}/{formato}")
-    if not indices or len(set(indices)) != len(indices):
+    return _planejar_faixas(_indexar_streams(streams), categoria, catalogos[categoria][formato], indices)
+
+
+def _indexar_streams(streams):
+    originais = {}
+    for stream in streams:
+        indice = stream.get("index")
+        if type(indice) is not int or indice < 0 or indice in originais:
+            raise ValueError(f"Índice de stream ausente, inválido ou duplicado: {indice}")
+        originais[indice] = stream
+    return originais
+
+
+def _planejar_faixas(originais, categoria, perfil, indices):
+    if (not indices or any(type(indice) is not int for indice in indices)
+            or len(set(indices)) != len(indices)):
         raise ValueError("Informe índices de streams distintos")
-    perfil = catalogos[categoria][formato]
     plano = []
     for indice in indices:
-        encontrados = [stream for stream in streams if stream.get("index") == indice]
-        if len(encontrados) != 1:
-            raise ValueError(f"Stream não encontrado ou duplicado: {indice}")
-        stream = encontrados[0]
+        stream = originais.get(indice)
+        if stream is None:
+            raise ValueError(f"Stream não encontrado: {indice}")
         tipo = stream.get("codec_type")
         codec = stream.get("codec_name")
         if tipo not in perfil or not isinstance(codec, str) or not codec:
@@ -147,6 +197,8 @@ def planejar_conversao(streams, categoria, formato, indices, *, catalogos=None):
             "candidato_copia": candidato,
             "decisao": "indefinido",
         })
+    if categoria == "video" and not any(_video_real(originais[indice]) for indice in indices):
+        raise ValueError("Selecione pelo menos uma faixa de vídeo")
     return plano
 
 
@@ -182,10 +234,150 @@ def _consultar_encoders(ffmpeg, cancelamento):
     return encoders
 
 
+def _tempo(valor):
+    try:
+        segundos = float(valor)
+    except (TypeError, ValueError):
+        return None
+    return segundos if math.isfinite(segundos) else None
+
+
+def _confirmar_fim_latm(entrada, ffmpeg, ffprobe, erro, faixas_latm, diagnostico_inicio, cancelamento):
+    linhas_latm = [
+        linha.strip() for linha in erro.stderr.strip().splitlines()
+        if not (diagnostico_inicio and ERRO_INICIO_H264.fullmatch(linha.strip()))
+    ]
+    erros_latm = [ERRO_DECODER_LATM.fullmatch(linha) for linha in linhas_latm]
+    if not erros_latm or not all(erros_latm):
+        return None
+    faixas = {int(linha[1]) for linha in erros_latm}
+    if not faixas <= faixas_latm:
+        return None
+
+    origem = inspecionar_arquivo(
+        entrada, ffprobe, cancelamento=cancelamento, detalhes=True, recuperar_inicio_ts=True, estimar_duracao=True,
+    )
+    formato = origem.get("format", {})
+    inicio = _tempo(formato.get("start_time"))
+    duracao = _tempo(formato.get("duration"))
+    if formato.get("format_name") != "mpegts" or inicio is None or duracao is None or duracao <= PERDA_MAXIMA_TS:
+        return None
+    limite = duracao - PERDA_MAXIMA_TS
+    progresso = re.findall(r"^out_time_us=(\d+)$", erro.stdout or "", re.M)
+    if not progresso or not limite <= int(progresso[-1]) / 1_000_000 <= duracao + TOLERANCIA_TIMESTAMPS_TS:
+        return None
+
+    originais = _indexar_streams(origem["streams"])
+    posicoes = {}
+    # A busca serve somente para reproduzir o erro. A posição vem do DTS do pacote, não do progresso.
+    for indice in sorted(faixas_latm):
+        if originais.get(indice, {}).get("codec_name") != "aac_latm":
+            return None
+        try:
+            base = Fraction(originais[indice]["time_base"])
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            return None
+        try:
+            _executar([
+                str(ffmpeg), "-nostdin", "-v", "warning", "-xerror", "-ss", f"{limite:.6f}",
+                "-protocol_whitelist", "file", "-i", str(entrada),
+                "-map", f"0:{indice}", "-f", "null", "-",
+            ], cancelamento)
+        except subprocess.CalledProcessError as falha:
+            linhas = falha.stderr.splitlines()
+            if not any(
+                (latm := ERRO_DECODER_LATM.fullmatch(linha.strip())) and int(latm[1]) == indice
+                for linha in linhas
+            ):
+                return None
+            pacotes = [
+                float(int(dts) * base) - inicio
+                for faixa, dts in PACOTE_CORROMPIDO_TS.findall(falha.stderr) if int(faixa) == indice
+            ]
+            if not pacotes or any(not limite <= posicao <= duracao for posicao in pacotes):
+                return None
+            posicoes[indice] = min(pacotes)
+    if not faixas <= posicoes.keys():
+        return None
+    corte = round(min(posicoes.values()) - MARGEM_CORTE_TS, 6)
+    if corte < limite:
+        return None
+    LOG.warning(
+        "Falha LATM em %s. Progresso de saída %.3f s. DTS relativo por faixa %s. "
+        "Nova tentativa de 0 a %.6f s de %.6f s estimados.\n%s",
+        entrada, int(progresso[-1]) / 1_000_000, posicoes, corte, duracao, "\n".join(linhas_latm),
+    )
+    return origem, corte
+
+
+def _primeiro_quadro_h264(entrada, ffprobe, indice, cancelamento):
+    try:
+        resultado = _executar([
+            str(ffprobe), "-v", "error", "-protocol_whitelist", "file", "-select_streams", str(indice),
+            "-skip_frame", "nokey", "-read_intervals", "%+5",
+            "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(entrada),
+        ], cancelamento)
+    except subprocess.CalledProcessError as erro:
+        raise RuntimeError(f"Falha ao confirmar o início do vídeo: {erro.stderr.strip()}") from erro
+    if resultado.stderr.strip() and not _diagnostico_inicio_h264(resultado.stderr.strip()):
+        raise RuntimeError(f"Falha ao confirmar o início do vídeo: {resultado.stderr.strip()}")
+    quadros = json.loads(resultado.stdout).get("frames", [])
+    tempos = [_tempo(quadro.get("best_effort_timestamp_time")) for quadro in quadros]
+    return min((tempo for tempo in tempos if tempo is not None), default=None)
+
+
+def _validar_tempos_recuperados(entrada, ffprobe, origem, corte, plano, resultado, cancelamento):
+    originais = _indexar_streams(origem["streams"])
+    inicio = float(origem["format"]["start_time"])
+    duracao = float(origem["format"]["duration"])
+    fins = []
+    for item, stream in zip(plano, resultado):
+        indice = item["index"]
+        original = originais[indice]
+        inicio_original = _tempo(original.get("start_time"))
+        duracao_original = _tempo(original.get("duration"))
+        inicio_saida = _tempo(stream.get("start_time"))
+        duracao_saida = _tempo(stream.get("duration"))
+        if (None in (inicio_original, duracao_original, inicio_saida, duracao_saida)
+                or duracao_original <= 0 or duracao_saida <= 0):
+            raise RuntimeError(f"Não foi possível verificar os limites da faixa {indice} recuperada")
+        inicio_esperado = inicio_original
+        if origem.get("diagnostico_inicio_ts") and item["codec"] == "h264":
+            inicio_esperado = _primeiro_quadro_h264(entrada, ffprobe, indice, cancelamento)
+            if inicio_esperado is None:
+                raise RuntimeError(f"Não foi possível localizar o primeiro quadro recuperável da faixa {indice}")
+        fim_original = inicio_original - inicio + duracao_original
+        fim_esperado = min(corte, fim_original)
+        fim_saida = inicio_saida + duracao_saida
+        if (abs(inicio_saida - (inicio_esperado - inicio)) > TOLERANCIA_TIMESTAMPS_TS
+                or abs(fim_saida - fim_esperado) > TOLERANCIA_TIMESTAMPS_TS
+                or fim_original - fim_saida > PERDA_MAXIMA_TS):
+            raise RuntimeError(f"A recuperação alterou os limites ou o sincronismo da faixa {indice}")
+        fins.append(fim_saida)
+    perda = duracao - max(fins)
+    if not 0 <= perda <= PERDA_MAXIMA_TS:
+        raise RuntimeError("A duração recuperada ficou fora do limite de perda aprovado")
+    return perda
+
+
+def _decodificar_saida(arquivo, ffmpeg, cancelamento, *, somente_video):
+    mapas = ["-map", "0:v"] if somente_video else ["-map", "0:v?", "-map", "0:a?"]
+    try:
+        resultado = _executar([
+            str(ffmpeg), "-nostdin", "-v", "error", "-xerror", "-abort_on", "empty_output_stream",
+            "-err_detect", "explode", "-protocol_whitelist", "file",
+            "-i", str(arquivo), *mapas, "-f", "null", "-",
+        ], cancelamento)
+    except subprocess.CalledProcessError as erro:
+        raise RuntimeError(f"Falha ao decodificar a saída recuperada: {erro.stderr.strip()}") from erro
+    if resultado.stderr.strip():
+        raise RuntimeError(f"Falha ao decodificar a saída recuperada: {resultado.stderr.strip()}")
+
+
 def converter(
     entrada, saida, categoria, formato, acoes, ffmpeg, ffprobe, *,
     cancelamento=None, informar_etapa=None, avisar=None, catalogos=None, selecionar_faixas=None,
-    avisar_inicio_ts=None,
+    avisar_inicio_ts=None, avisar_fim_ts=None,
 ):
     """Converte streams selecionados por índice, com ações 'copiar' ou 'recodificar'.
 
@@ -211,7 +403,7 @@ def converter(
     inspecao = inspecionar_arquivo(
         entrada, ffprobe, cancelamento=cancelamento, detalhes=True, recuperar_inicio_ts=True,
     )
-    streams = inspecao["streams"]
+    originais = _indexar_streams(inspecao["streams"])
     automatico = acoes is None
     faixa_unica = categoria == "audio" and formato in PERFIS_AUDIO_FAIXA_UNICA
     restricao = (
@@ -221,11 +413,11 @@ def converter(
     if automatico:
         elegiveis = {}
         omitidas = []
-        for stream in streams:
+        for indice, stream in originais.items():
             tipo = stream.get("codec_type")
-            capa = tipo == "video" and stream.get("disposition", {}).get("attached_pic")
-            if tipo == "audio" or (categoria == "video" and tipo == "video" and not capa):
-                elegiveis[stream["index"]] = stream
+            capa = tipo == "video" and not _video_real(stream)
+            if tipo == "audio" or (categoria == "video" and _video_real(stream)):
+                elegiveis[indice] = stream
             elif tipo != "video" or capa:
                 omitidas.append("capa" if capa else tipo)
         if categoria == "video" and not any(s["codec_type"] == "video" for s in elegiveis.values()):
@@ -240,13 +432,10 @@ def converter(
             indices = dict.fromkeys(revisadas)
             if not indices or len(indices) != len(revisadas) or indices.keys() - elegiveis.keys():
                 raise ValueError("Seleção de faixas inválida")
-            if categoria == "video" and not any(elegiveis[i]["codec_type"] == "video" for i in indices):
-                raise ValueError("Selecione pelo menos uma faixa de vídeo")
             if faixa_unica and len(indices) != 1:
                 raise RuntimeError(restricao)
         acoes = dict.fromkeys(indices, "automatico")
-    plano = planejar_conversao(streams, categoria, formato, list(acoes), catalogos=catalogos)
-    originais = {stream.get("index"): stream for stream in streams}
+    plano = _planejar_faixas(originais, categoria, perfil, list(acoes))
 
     comando = [
         str(ffmpeg), "-nostdin", "-v", "error", "-xerror", "-abort_on", "empty_output_stream",
@@ -303,6 +492,7 @@ def converter(
         if faixa_unica and len(plano) != 1:
             raise RuntimeError(restricao)
         temporario = pasta / ("resultado" + saida.suffix)
+        recuperacao = None
         if informar_etapa:
             informar_etapa("conversao")
         while True:
@@ -332,12 +522,35 @@ def converter(
                     codecs_esperados.append(encoders_disponiveis[codec])
                 else:
                     raise ValueError(f"Ação inválida para stream {indice}: {acao}")
+            faixas_latm = {
+                item["index"] for item in plano if item["codec"] == "aac_latm" and item["decisao"] == "recodificar"
+            } if inspecao.get("format", {}).get("format_name") == "mpegts" else set()
+            if faixas_latm:
+                argumentos.extend(["-progress", "pipe:1"])
             try:
                 _executar(argumentos + ["-n", str(temporario)], cancelamento)
             except FileNotFoundError as erro:
                 raise FileNotFoundError(f"FFmpeg não encontrado: {ffmpeg}") from erro
             except subprocess.CalledProcessError as erro:
                 diagnostico = erro.stderr.strip()
+                if faixas_latm:
+                    recuperacao = _confirmar_fim_latm(
+                        entrada, ffmpeg, ffprobe, erro, faixas_latm, inspecao.get("diagnostico_inicio_ts"), cancelamento,
+                    )
+                if recuperacao is not None:
+                    _, corte = recuperacao
+                    temporario.unlink(missing_ok=True)
+                    temporario = pasta / ("recuperado" + saida.suffix)
+                    try:
+                        tentativa = _executar(argumentos + ["-t", f"{corte:.6f}", "-n", str(temporario)], cancelamento)
+                    except subprocess.CalledProcessError as nova_falha:
+                        raise RuntimeError(f"Falha ao recuperar o fim do TS: {nova_falha.stderr.strip()}") from nova_falha
+                    restante = tentativa.stderr.strip()
+                    if restante and not (
+                        inspecao.get("diagnostico_inicio_ts") and _diagnostico_inicio_h264(restante)
+                    ):
+                        raise RuntimeError(f"Falha ao recuperar o fim do TS: {restante}")
+                    break
                 rejeitou, posicao = _rejeicao_de_copia(diagnostico)
                 if (not automatico or not rejeitou or posicao is None or posicao >= len(plano)
                         or plano[posicao]["decisao"] != "copiar"):
@@ -383,16 +596,21 @@ def converter(
                 if duracao_original > 0 and abs(float(duracao_saida) - duracao_original) > tolerancia:
                     raise RuntimeError(f"A saída alterou a duração da faixa {item['index']}")
         diagnostico_inicio = inspecao.get("diagnostico_inicio_ts")
-        if diagnostico_inicio and any(item["tipo"] == "video" for item in plano):
-            try:
-                decodificacao = _executar([
-                    str(ffmpeg), "-nostdin", "-v", "error", "-xerror", "-protocol_whitelist", "file",
-                    "-i", str(temporario), "-map", "0:v", "-f", "null", "-",
-                ], cancelamento)
-            except subprocess.CalledProcessError as erro:
-                raise RuntimeError(f"Falha ao decodificar o vídeo recuperado: {erro.stderr.strip()}") from erro
-            if decodificacao.stderr.strip():
-                raise RuntimeError(f"Falha ao decodificar o vídeo recuperado: {decodificacao.stderr.strip()}")
+        video_recuperado = diagnostico_inicio and any(item["tipo"] == "video" for item in plano)
+        if recuperacao is not None:
+            origem, corte = recuperacao
+            perda = _validar_tempos_recuperados(entrada, ffprobe, origem, corte, plano, resultado, cancelamento)
+            _decodificar_saida(temporario, ffmpeg, cancelamento, somente_video=False)
+            if avisar_fim_ts:
+                avisar_fim_ts(perda)
+            else:
+                warnings.warn(
+                    f"Os últimos {perda:.2f} s estimados do MPEG-TS foram omitidos na recuperação.",
+                    RuntimeWarning,
+                )
+        elif video_recuperado:
+            _decodificar_saida(temporario, ffmpeg, cancelamento, somente_video=True)
+        if video_recuperado:
             if avisar_inicio_ts:
                 avisar_inicio_ts(diagnostico_inicio)
             else:
@@ -403,4 +621,6 @@ def converter(
             os.rename(temporario, saida)
         else:
             os.link(temporario, saida)
+    if recuperacao is not None:
+        LOG.warning("Recuperação LATM validada e publicada em %s. Perda final estimada %.3f s.", saida, perda)
     return saida

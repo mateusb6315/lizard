@@ -84,6 +84,28 @@ class TestIntegracaoConversor(unittest.TestCase):
             self.assertGreater(tamanhos[0], 100_000)
             self.assertAlmostEqual(*tamanhos, delta=2 * 1536)
 
+    def test_ts_latm_integro_preserva_audio_estereo_e_multicanal_sem_recorte(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            entrada = Path(pasta) / "LATM.ts"
+            saida = Path(pasta) / "LATM.mp4"
+            subprocess.run([
+                str(FFMPEG), "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=176x144:r=25:d=2",
+                "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=2",
+                "-f", "lavfi", "-i", "anullsrc=r=48000:cl=5.1:d=2",
+                "-map", "0:v", "-map", "1:a", "-map", "2:a",
+                "-c:v", "libopenh264", "-c:a", "aac", "-mpegts_flags", "+latm", str(entrada),
+            ], check=True, capture_output=True)
+            origem = inspecionar_arquivo(entrada, FFPROBE, detalhes=True, estimar_duracao=True)
+            self.assertEqual([s["codec_name"] for s in origem["streams"]], ["h264", "aac_latm", "aac_latm"])
+            avisos = []
+            converter(entrada, saida, "video", "mp4", None, FFMPEG, FFPROBE, avisar_fim_ts=avisos.append)
+            self.assertEqual(avisos, [])
+            resultado = inspecionar_arquivo(saida, FFPROBE, detalhes=True)
+            self.assertEqual([(s["codec_name"], s.get("channels")) for s in resultado["streams"]],
+                             [("h264", None), ("aac", 2), ("aac", 6)])
+            self.assertAlmostEqual(float(origem["format"]["duration"]), float(resultado["format"]["duration"]),
+                                   delta=0.08)
+
     def test_mkv_com_capitulos_copia_faixas_para_mp4_e_m4a(self):
         with tempfile.TemporaryDirectory() as pasta:
             pasta = Path(pasta)

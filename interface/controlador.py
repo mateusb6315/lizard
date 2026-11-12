@@ -1,11 +1,10 @@
 # controlador intermediário entre a interface e os serviços. é sua única responsabilidade, seguindo o padrão SRP
 
-import json
 import logging
 from pathlib import Path
 from threading import Event
 
-from PyQt6.QtCore import QIODevice, QObject, QSaveFile, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
 from interface import textos
@@ -32,6 +31,7 @@ class ConversaoEmSegundoPlano(QThread):
         self.erro = None
         self.avisos = []
         self.inicio_ts_recuperado = False
+        self.perda_fim_ts = None
 
     def run(self):
         try:
@@ -40,6 +40,7 @@ class ConversaoEmSegundoPlano(QThread):
                 informar_etapa=self.etapa_alterada.emit, avisar=self.avisos.append,
                 catalogos=self.catalogos, selecionar_faixas=self.revisar_faixas,
                 avisar_inicio_ts=self.avisar_inicio_ts,
+                avisar_fim_ts=self.avisar_fim_ts,
             )
         except conversor.ConversaoCancelada:
             pass
@@ -49,6 +50,9 @@ class ConversaoEmSegundoPlano(QThread):
     def avisar_inicio_ts(self, diagnostico):
         self.inicio_ts_recuperado = True
         LOG.warning("Início de TS recuperado em %s\n%s", self.argumentos[0], diagnostico)
+
+    def avisar_fim_ts(self, perda):
+        self.perda_fim_ts = perda
 
     def revisar_faixas(self, faixas, omitidas, faixa_unica):
         if len(faixas) == 1 and not omitidas:
@@ -65,10 +69,9 @@ class ConversaoEmSegundoPlano(QThread):
 
 
 class Controlador(QObject):
-    def __init__(self, janela, ferramentas, preferencias=None, *, catalogos=None, preferencias_anteriores=None):
+    def __init__(self, janela, ferramentas, *, catalogos=None):
         super().__init__(janela)
         self.janela = janela
-        self.preferencias = preferencias
         self.catalogos = carregar_formatos() if catalogos is None else catalogos
         self.ffmpeg, self.ffprobe = conversor.caminhos_ferramentas(ferramentas)
         self.entrada = None
@@ -88,17 +91,6 @@ class Controlador(QObject):
         janela.converter_solicitado.connect(self.converter)
         janela.categoria.currentIndexChanged.connect(self.atualizar_perfis)
         self.atualizar_perfis()
-        if self.preferencias is not None:
-            caminho = self.preferencias
-            if preferencias_anteriores is not None and not caminho.exists():
-                caminho = preferencias_anteriores
-            try:
-                dados = json.loads(caminho.read_text(encoding="utf-8"))
-                if isinstance(dados, dict) and dados.get("theme") == "dark":
-                    janela.alternador_tema.grupo.button(1).setChecked(True)
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-                pass
-            janela.fechamento_confirmado.connect(self.salvar_tema)
 
     def atualizar_perfis(self):
         categoria = self.janela.categoria.currentData()
@@ -107,21 +99,6 @@ class Controlador(QObject):
         for formato, perfil in self.catalogos.get(categoria, {}).items():
             seletor.addItem(formato.upper(), (categoria, formato, perfil["extension"]))
         self.janela.atualizar_disponibilidade(self.entrada is not None)
-
-    def salvar_tema(self):
-        tema = "dark" if self.janela.alternador_tema.grupo.checkedId() == 1 else "default"
-        try:
-            self.preferencias.parent.mkdir(parents=True, exist_ok=True)
-            arquivo = QSaveFile(str(self.preferencias))
-            conteudo = (json.dumps({"theme": tema}) + "\n").encode("utf-8")
-            if arquivo.open(QIODevice.OpenModeFlag.WriteOnly) and (
-                arquivo.write(conteudo) == len(conteudo) and arquivo.commit()
-            ):
-                return
-            LOG.error("Falha ao gravar o tema em %s: %s", self.preferencias, arquivo.errorString())
-        except OSError:
-            LOG.exception("Falha ao gravar o tema em %s", self.preferencias)
-        self.janela.exibir_mensagem(textos.PREFERENCIAS_ERRO, QMessageBox.Icon.Warning)
 
     def abrir(self):
         arquivo = self.janela.escolher_entrada(self.filtro_entrada)
@@ -215,11 +192,14 @@ class Controlador(QObject):
         else:
             mensagem = textos.SUCESSO.format(saida=tarefa.saida)
             icone = QMessageBox.Icon.Information
-            if tarefa.avisos or tarefa.inicio_ts_recuperado:
+            if tarefa.avisos or tarefa.inicio_ts_recuperado or tarefa.perda_fim_ts is not None:
                 icone = QMessageBox.Icon.Warning
             if tarefa.avisos:
                 mensagem += "\n\n" + textos.AVISO_RECODIFICACAO
             if tarefa.inicio_ts_recuperado:
                 mensagem += "\n\n" + textos.AVISO_INICIO_TS
+            if tarefa.perda_fim_ts is not None:
+                perda = f"{tarefa.perda_fim_ts:.2f}".replace(".", ",")
+                mensagem += "\n\n" + textos.AVISO_FIM_TS.format(perda=perda)
         tarefa.deleteLater()
         self.janela.exibir_mensagem(mensagem, icone)

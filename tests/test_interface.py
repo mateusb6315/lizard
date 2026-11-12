@@ -16,9 +16,8 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 import main as aplicativo
 from interface import textos
 from interface.componentes import DialogoProgresso
-from interface.componentes import JanelaPrincipal
-from interface.controlador import Controlador
 from main import criar_janela
+from services import logger as armazenamento
 from services.metadados import carregar_formatos
 
 
@@ -30,6 +29,15 @@ class TestInterface(unittest.TestCase):
     def setUp(self):
         self.janela = criar_janela()
         self.addCleanup(self.janela.close)
+
+    def _janela_compilada(self, destino, anterior=None):
+        executavel = self.janela.recursos.parent / "Lizard.exe"
+        with (
+            patch.object(aplicativo.sys, "frozen", True, create=True),
+            patch.object(aplicativo.sys, "executable", str(executavel)),
+            patch.object(aplicativo, "config_preferencias", return_value=(destino, anterior)),
+        ):
+            return criar_janela()
 
     def test_abrir_pelo_menu_seleciona_sem_converter(self):
         self.assertFalse(self.janela.botao_converter.isEnabled())
@@ -170,30 +178,25 @@ class TestInterface(unittest.TestCase):
         self.assertFalse(self.janela.isVisible())
 
     def test_tema_persiste_no_fechamento_e_reabre(self):
-        recursos = Path(__file__).resolve().parents[1] / "resources"
         with tempfile.TemporaryDirectory() as pasta:
             preferencias = Path(pasta) / "preferences.json"
             for indice, tema in ((1, "dark"), (0, "default")):
-                janela = JanelaPrincipal(recursos)
-                controlador = Controlador(janela, Path(pasta), preferencias)
+                janela = self._janela_compilada(preferencias)
                 janela.alternador_tema.grupo.button(indice).click()
                 if indice == 1:
                     self.assertFalse(preferencias.exists())
                 janela.show()
                 janela.acao_sair.trigger()
                 self.assertEqual(json.loads(preferencias.read_text(encoding="utf-8")), {"theme": tema})
-                reaberta = JanelaPrincipal(recursos)
-                controlador_reaberto = Controlador(reaberta, Path(pasta), preferencias)
+                reaberta = self._janela_compilada(preferencias)
                 self.assertEqual(reaberta.alternador_tema.grupo.checkedId(), indice)
                 reaberta.close()
 
     def test_preferencias_invalidas_abrem_no_tema_claro(self):
-        recursos = Path(__file__).resolve().parents[1] / "resources"
         with tempfile.TemporaryDirectory() as pasta:
             preferencias = Path(pasta) / "preferences.json"
             preferencias.write_text("{", encoding="utf-8")
-            janela = JanelaPrincipal(recursos)
-            controlador = Controlador(janela, Path(pasta), preferencias)
+            janela = self._janela_compilada(preferencias)
             self.assertEqual(janela.alternador_tema.grupo.checkedId(), 0)
             janela.close()
 
@@ -206,33 +209,27 @@ class TestInterface(unittest.TestCase):
             antiga.parent.mkdir(parents=True)
             antiga.write_text('{"theme": "dark"}', encoding="utf-8")
             usuario = pasta / "LocalAppData"
-            recursos = self.janela.recursos
-            with (
-                patch.dict(os.environ, {"ProgramFiles": str(programas)}),
-                patch.object(aplicativo.QStandardPaths, "writableLocation", return_value=str(usuario)),
-            ):
-                destino, anterior = aplicativo._preferencias_compilado(pacote)
-                self.assertEqual(destino, usuario / textos.TITULO / "preferences.json")
+            with patch.dict(os.environ, {"ProgramFiles": str(programas)}):
+                destino, anterior = armazenamento.config_preferencias(pacote, usuario)
+                self.assertEqual(destino, usuario / "LizardConverter" / "preferences.json")
                 self.assertEqual(anterior, antiga)
                 self.assertEqual(
-                    aplicativo._preferencias_compilado(pasta / "portatil"),
+                    armazenamento.config_preferencias(pasta / "portatil", usuario),
                     (pasta / "portatil" / "data" / "preferences.json", None),
                 )
                 personalizado = pasta / "instalacao personalizada"
                 personalizado.mkdir()
                 (personalizado / "unins000.exe").touch()
                 (personalizado / "unins000.dat").touch()
-                self.assertEqual(aplicativo._preferencias_compilado(personalizado)[0], destino)
-            janela = JanelaPrincipal(recursos)
-            Controlador(janela, pacote / "tools", destino, preferencias_anteriores=anterior)
+                self.assertEqual(armazenamento.config_preferencias(personalizado, usuario)[0], destino)
+            janela = self._janela_compilada(destino, anterior)
             self.assertEqual(janela.alternador_tema.grupo.checkedId(), 1)
             self.assertFalse(destino.exists())
             janela.alternador_tema.grupo.button(0).click()
             janela.close()
             self.assertEqual(json.loads(destino.read_text(encoding="utf-8")), {"theme": "default"})
             self.assertEqual(json.loads(antiga.read_text(encoding="utf-8")), {"theme": "dark"})
-            reaberta = JanelaPrincipal(recursos)
-            Controlador(reaberta, pacote / "tools", destino, preferencias_anteriores=anterior)
+            reaberta = self._janela_compilada(destino, anterior)
             self.assertEqual(reaberta.alternador_tema.grupo.checkedId(), 0)
             reaberta.close()
 
@@ -240,8 +237,7 @@ class TestInterface(unittest.TestCase):
         with tempfile.TemporaryDirectory() as pasta:
             destino = Path(pasta) / "arquivo" / "preferences.json"
             destino.parent.touch()
-            janela = JanelaPrincipal(self.janela.recursos)
-            Controlador(janela, Path(pasta), destino)
+            janela = self._janela_compilada(destino)
             with patch.object(janela, "exibir_mensagem") as mensagem, self.assertLogs("lizard") as log:
                 janela.close()
             mensagem.assert_called_once_with(textos.PREFERENCIAS_ERRO, QMessageBox.Icon.Warning)
@@ -281,17 +277,43 @@ class TestInterface(unittest.TestCase):
     def test_configura_log_local_em_utf8(self):
         with tempfile.TemporaryDirectory() as pasta:
             logger = logging.Logger("teste-lizard")
-            with (
-                patch.object(aplicativo.QStandardPaths, "writableLocation", return_value=pasta),
-                patch.object(aplicativo.logging, "getLogger", return_value=logger),
-            ):
-                aplicativo.configurar_log()
-                aplicativo.configurar_log()
+            with patch.object(armazenamento, "LOG", logger):
+                armazenamento.config_logger(pasta)
+                armazenamento.config_logger(pasta)
             try:
                 self.assertEqual(len(logger.handlers), 1)
+                self.assertEqual(logger.handlers[0].maxBytes, 1_000_000)
+                self.assertEqual(logger.handlers[0].backupCount, 2)
                 logger.error("Falha ao converter a faixa de áudio")
-                log = Path(pasta) / textos.TITULO / "lizard.log"
+                log = Path(pasta) / "LizardConverter" / "lizard.log"
                 self.assertIn("Falha ao converter a faixa de áudio", log.read_text(encoding="utf-8"))
             finally:
                 for handler in logger.handlers:
                     handler.close()
+
+    def test_base_local_ausente_preserva_leitura_legada_sem_gravar_em_instalacao(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            programas = Path(pasta)
+            pacote = programas / "LizardConverter"
+            antiga = pacote / "data" / "preferences.json"
+            antiga.parent.mkdir(parents=True)
+            antiga.write_text('{"theme": "dark"}', encoding="utf-8")
+            with patch.dict(os.environ, {"ProgramFiles": str(programas)}):
+                self.assertEqual(armazenamento.config_preferencias(pacote, ""), (None, antiga))
+            with patch.object(armazenamento, "RotatingFileHandler") as handler:
+                armazenamento.config_logger("")
+                handler.assert_not_called()
+            janela = self._janela_compilada(None, antiga)
+            self.assertEqual(janela.alternador_tema.grupo.checkedId(), 1)
+            janela.alternador_tema.grupo.button(0).click()
+            janela.close()
+            self.assertEqual(json.loads(antiga.read_text(encoding="utf-8")), {"theme": "dark"})
+
+    def test_falha_na_substituicao_atomica_preserva_preferencia(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            destino = Path(pasta) / "preferences.json"
+            destino.write_text('{"theme": "dark"}', encoding="utf-8")
+            with patch.object(Path, "replace", side_effect=PermissionError), self.assertLogs("lizard"):
+                self.assertFalse(armazenamento.gravar_tema(destino, "default"))
+            self.assertEqual(armazenamento.ler_tema(destino, None), "dark")
+            self.assertEqual(list(destino.parent.iterdir()), [destino])

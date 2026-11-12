@@ -28,6 +28,11 @@ SUCESSO = "Conversão concluída.\n{saida}"
 ERRO = "Não foi possível concluir a conversão."
 AVISO_RECODIFICACAO = "Foi necessário recodificar uma ou mais faixas."
 AVISO_INICIO_TS = "O vídeo convertido começa no primeiro quadro recuperável."
+AVISO_FIM_TS = (
+    "A recuperação automática removeu cerca de {perda} s do fim do MPEG-TS. "
+    "O arquivo convertido pode apresentar falhas de reprodução devido à compatibilidade limitada "
+    "entre MPEG-TS e o formato escolhido."
+)
 CANCELADO = "Conversão cancelada."
 PROGRESSO = "Conversão em andamento"
 TEMPO = "Tempo decorrido {tempo}"

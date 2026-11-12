@@ -7,12 +7,15 @@ O nome comercial é **LizardConverter**. O build portátil para Windows x64 entr
 - `main.py` inicia o PyQt6 e resolve caminhos pela raiz do projeto em desenvolvimento ou pela pasta do executável no pacote.
 - `interface/componentes.py` define a janela e o tema claro. Os recursos claros estão referenciados em `interface/themes/default.py`. A paleta e os ajustes escuros ficam em `interface/themes/dark.py`.
 - `interface/controlador.py` liga a interface ao serviço em uma thread de trabalho. `services/metadados.py` carrega os catálogos de `data/formatos/`. `services/conversor.py` inspeciona, planeja, executa e verifica a saída.
+- `services/logger.py` configura o log local, resolve o caminho de preferências e lê e grava o tema. `main.py` fornece a base de dados do Qt e conecta a preferência à janela na abertura e no fechamento.
 
 ## Decisões do produto
 
 - Os catálogos são lidos na inicialização e declaram candidatos à cópia. O serviço oferece ao controlador as faixas elegíveis para revisão após o FFprobe. A interface informa as omissões e limita a escolha de faixas nos formatos de áudio de faixa única. O serviço testa as cópias e valida a saída antes de disponibilizá-la em um caminho novo.
 - Uma rejeição de cópia reconhecida permite recodificar a faixa afetada, com aviso. A execução combinada exige que o diagnóstico identifique o índice de saída. As janelas de erro usam mensagens curtas e os diagnósticos ficam em `%LOCALAPPDATA%\LizardConverter\lizard.log`.
-- O pacote portátil grava o tema em `data/preferences.json` no fechamento normal. Em Program Files ou em instalações reconhecidas do Inno Setup, a preferência fica em `%LOCALAPPDATA%\LizardConverter\preferences.json` e a leitura inicial pode recuperar o arquivo antigo ao lado do executável. O formato continua `{"theme": "dark"}` ou `{"theme": "default"}`.
+- Os índices são validados antes da seleção. Perfis de vídeo exigem pelo menos um vídeo real também na API explícita.
+- Para MPEG-TS, a Beta 4 reconhece a falta inicial de SPS/PPS com H.264 utilizável. Um erro LATM localizado no último segundo admite uma tentativa automática com corte estimado de até 1 s e aviso. O áudio válido do início é preservado. A recuperação exige verificação de faixas, tempos e decodificação integral antes de publicar.
+- O pacote portátil grava o tema de forma atômica em `data/preferences.json` no fechamento normal. Em Program Files ou em instalações reconhecidas do Inno Setup, a preferência fica em `%LOCALAPPDATA%\LizardConverter\preferences.json` e a leitura inicial pode recuperar o arquivo antigo ao lado do executável. Com base local vazia, a instalação pode ler o tema legado e a gravação por usuário é desativada. O formato continua `{"theme": "dark"}` ou `{"theme": "default"}`.
 - `docs/` e `temp/` são diretórios locais ignorados pelo Git. `README.md` e `README_en.md` são as referências públicas para uso e contribuição. O arquivo `LICENSE` da raiz contém a Licença MIT do projeto. Os componentes de terceiros seguem os termos que acompanham seus recursos e o pacote.
 
 ## Empacotamento e verificação
