@@ -3,7 +3,7 @@
 import sys
 
 from compilar import main
-from compressao import finalizar
+from finalizacao import finalizar
 
 
 if __name__ == "__main__":
