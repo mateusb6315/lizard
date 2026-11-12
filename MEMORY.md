@@ -10,8 +10,8 @@ O nome comercial é **LizardConverter**. O build portátil para Windows x64 entr
 
 ## Decisões do produto
 
-- Os catálogos declaram candidatos à cópia. A seleção automática separa áudio de vídeo e exclui capas anexadas. O serviço usa FFprobe e verifica as tentativas de cópia no formato de destino. A saída é validada antes da publicação em um caminho novo.
-- A persistência de tema está ativa no pacote compilado. No fechamento normal, `data/preferences.json` recebe `{"theme": "dark"}` ou `{"theme": "default"}`. A ausência ou invalidade do arquivo resulta no tema claro.
+- Os catálogos são lidos na inicialização e declaram candidatos à cópia. O serviço oferece ao controlador as faixas elegíveis para revisão após o FFprobe. A interface informa as omissões e limita a escolha de faixas nos formatos de áudio de faixa única. O serviço testa as cópias e valida a saída antes de disponibilizá-la em um caminho novo.
+- O pacote portátil grava o tema em `data/preferences.json` no fechamento normal. Em Program Files ou em instalações reconhecidas do Inno Setup, a preferência fica em `%LOCALAPPDATA%\LizardConverter\preferences.json` e a leitura inicial pode recuperar o arquivo antigo ao lado do executável. O formato continua `{"theme": "dark"}` ou `{"theme": "default"}`.
 - `docs/` e `temp/` são diretórios locais ignorados pelo Git. `README.md` e `README_en.md` são as referências públicas para uso e contribuição. O arquivo `LICENSE` da raiz contém a Licença MIT do projeto. Os componentes de terceiros seguem os termos que acompanham seus recursos e o pacote.
 
 ## Empacotamento e verificação

@@ -30,6 +30,59 @@ class TestCancelamento(unittest.TestCase):
 
 @unittest.skipUnless(FFMPEG.is_file() and FFPROBE.is_file(), "FFmpeg e FFprobe locais ausentes")
 class TestIntegracaoConversor(unittest.TestCase):
+    def test_recodifica_aac_para_mp3_sem_colidir_com_sondagem(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "entrada AAC.m4a"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i", "sine=duration=0.4",
+                 "-c:a", "aac", str(entrada)], check=True, capture_output=True,
+            )
+            for nome in ("teste-0.mp3", "áudio convertido.mp3"):
+                with self.subTest(nome=nome):
+                    saida = pasta / nome
+                    with self.assertWarnsRegex(RuntimeWarning, "exige recodificação"):
+                        self.assertEqual(converter(entrada, saida, "audio", "mp3", None, FFMPEG, FFPROBE), saida)
+                    streams = inspecionar_arquivo(saida, FFPROBE)
+                    self.assertEqual([(s["codec_type"], s["codec_name"], s["channels"]) for s in streams],
+                                     [("audio", "mp3", 1)])
+                    conteudo = saida.read_bytes()
+                    with self.assertRaises(FileExistsError):
+                        converter(entrada, saida, "audio", "mp3", None, FFMPEG, FFPROBE)
+                    self.assertEqual(saida.read_bytes(), conteudo)
+                    self.assertEqual(list(pasta.glob(".blackberry-*")), [])
+
+    def test_rejeita_video_sem_audio_e_entrada_truncada(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "entrada.mp4"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=64x64:duration=0.8",
+                 "-c:v", "mpeg4", "-movflags", "+faststart", str(entrada)], check=True, capture_output=True,
+            )
+            with self.assertRaisesRegex(ValueError, "não contém faixas de áudio"):
+                converter(entrada, pasta / "audio.mp3", "audio", "mp3", None, FFMPEG, FFPROBE)
+            dados = entrada.read_bytes()
+            truncada = pasta / "truncada.mp4"
+            truncada.write_bytes(dados[:len(dados) // 2])
+            with self.assertRaisesRegex(RuntimeError, "inspecionar|Cópia|conversão"):
+                converter(truncada, pasta / "saida.mp4", "video", "mp4", None, FFMPEG, FFPROBE)
+            self.assertEqual(set(pasta.iterdir()), {entrada, truncada})
+
+    def test_copia_audio_multicanal_preservando_canais_e_duracao(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "5.1.wav"
+            saida = pasta / "5.1 copia.wav"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i", "anullsrc=cl=5.1:d=0.5",
+                 "-c:a", "pcm_s16le", str(entrada)], check=True, capture_output=True,
+            )
+            converter(entrada, saida, "audio", "wav", None, FFMPEG, FFPROBE)
+            faixa, = inspecionar_arquivo(saida, FFPROBE)
+            self.assertEqual((faixa["codec_name"], faixa["channels"]), ("pcm_s16le", 6))
+            self.assertAlmostEqual(float(faixa["duration"]), 0.5, delta=0.01)
+
     def test_video_para_audio_automatico(self):
         with tempfile.TemporaryDirectory() as pasta:
             pasta = Path(pasta)

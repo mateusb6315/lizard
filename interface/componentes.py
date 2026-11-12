@@ -9,9 +9,9 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPalette, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
-    QApplication, QButtonGroup, QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout,
-    QLabel, QMainWindow, QMessageBox, QProgressBar, QPushButton, QStyledItemDelegate,
-    QToolButton, QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QProgressBar,
+    QPushButton, QRadioButton, QScrollArea, QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget,
 )
 
 from interface import textos
@@ -40,7 +40,8 @@ QToolButton#botaoTema:focus { border-color: #8764b6; }
 
 
 def aplicar_tema(app):
-    app.setStyle("Fusion")
+    if app.style().objectName().lower() != "fusion":
+        app.setStyle("Fusion")
     paleta = app.style().standardPalette()
     for papel, cor in (
         (QPalette.ColorRole.Window, "#f8f5fc"),
@@ -57,10 +58,21 @@ def aplicar_tema(app):
     app.setStyleSheet(ESTILO)
 
 
+def _icone_svg(dados, cor):
+    svg = QSvgRenderer(QByteArray(dados.replace(b"currentColor", cor.name().encode("ascii"))))
+    pixmap = QPixmap(36, 36)
+    pixmap.setDevicePixelRatio(2)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    pintor = QPainter(pixmap)
+    svg.render(pintor, QRectF(0, 0, 18, 18))
+    pintor.end()
+    return QIcon(pixmap)
+
+
 class OpcaoCompacta(QStyledItemDelegate):
     def sizeHint(self, opcao, indice):
         tamanho = super().sizeHint(opcao, indice)
-        tamanho.setHeight(opcao.fontMetrics.height() + 3)
+        tamanho.setHeight(max(opcao.fontMetrics.height(), opcao.decorationSize.height()) + 3)
         return tamanho
 
 
@@ -102,14 +114,7 @@ class AlternadorTema(QWidget):
 
     def atualizar_icones(self, cor):
         for botao, dados in self.icones.items():
-            svg = QSvgRenderer(QByteArray(dados.replace(b"currentColor", cor.name().encode("ascii"))))
-            pixmap = QPixmap(36, 36)
-            pixmap.setDevicePixelRatio(2)
-            pixmap.fill(Qt.GlobalColor.transparent)
-            pintor = QPainter(pixmap)
-            svg.render(pintor, QRectF(0, 0, 18, 18))
-            pintor.end()
-            botao.setIcon(QIcon(pixmap))
+            botao.setIcon(_icone_svg(dados, cor))
 
     def _alternar(self, indice, marcado):
         if marcado:
@@ -184,6 +189,65 @@ class DialogoProgresso(QDialog):
         self.reject()
 
 
+class DialogoFaixas(QDialog):
+    def __init__(self, pai, categoria, formato, faixas, omitidas, faixa_unica):
+        super().__init__(pai)
+        self.setWindowTitle(textos.FAIXAS)
+        self.setMinimumWidth(460)
+        self.categoria = categoria
+        layout = QVBoxLayout(self)
+        mensagens = [textos.SELECIONAR_FAIXAS.format(formato=formato.upper())]
+        if faixa_unica:
+            mensagens.append(textos.FAIXA_UNICA)
+        if omitidas:
+            tipos = dict.fromkeys(textos.TIPOS_OMITIDOS.get(tipo, textos.OUTRAS_FAIXAS) for tipo in omitidas)
+            mensagens.append(textos.FAIXAS_OMITIDAS.format(tipos=", ".join(tipos)))
+        aviso = QLabel("\n\n".join(mensagens))
+        aviso.setWordWrap(True)
+        layout.addWidget(aviso)
+
+        conteudo = QWidget()
+        lista = QVBoxLayout(conteudo)
+        rolagem = QScrollArea()
+        rolagem.setWidgetResizable(True)
+        rolagem.setWidget(conteudo)
+        layout.addWidget(rolagem)
+        self.faixas = []
+        for posicao, faixa in enumerate(faixas):
+            indice = faixa["index"]
+            tipo = faixa["codec_type"]
+            tags = faixa.get("tags", {})
+            detalhes = [textos.CATEGORIAS[tipo], faixa.get("codec_name", "")]
+            detalhes.extend(tags[chave] for chave in ("language", "title") if tags.get(chave))
+            rotulo = f"{indice} · " + " · ".join(filter(None, detalhes))
+            botao = QRadioButton(rotulo) if faixa_unica else QCheckBox(rotulo)
+            botao.setChecked(not faixa_unica or posicao == 0)
+            self.faixas.append((indice, tipo, botao))
+            lista.addWidget(botao)
+        lista.addStretch()
+
+        botoes = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+        )
+        self.continuar = botoes.button(QDialogButtonBox.StandardButton.Ok)
+        self.continuar.setText(textos.CONTINUAR)
+        botoes.button(QDialogButtonBox.StandardButton.Cancel).setText(textos.CANCELAR)
+        botoes.accepted.connect(self.accept)
+        botoes.rejected.connect(self.reject)
+        layout.addWidget(botoes)
+        for _, _, botao in self.faixas:
+            botao.toggled.connect(self._atualizar_continuar)
+        self._atualizar_continuar()
+
+    def _atualizar_continuar(self):
+        self.continuar.setEnabled(any(
+            tipo == self.categoria and botao.isChecked() for _, tipo, botao in self.faixas
+        ))
+
+    def indices(self):
+        return tuple(indice for indice, _, botao in self.faixas if botao.isChecked())
+
+
 class JanelaPrincipal(QMainWindow):
     abrir_solicitado = pyqtSignal()
     converter_solicitado = pyqtSignal()
@@ -230,6 +294,18 @@ class JanelaPrincipal(QMainWindow):
         linha.addWidget(self.entrada, 1)
         formulario = QVBoxLayout()
         linha.addLayout(formulario, 1)
+        self.categoria = QComboBox()
+        self.categoria.setItemDelegate(OpcaoCompacta(self.categoria))
+        self.categoria.setIconSize(QSize(18, 18))
+        self.icones_categoria = [
+            (recursos / arquivo).read_bytes() for arquivo in ("video.svg", "music.svg")
+        ]
+        for tipo, rotulo in textos.CATEGORIAS.items():
+            self.categoria.addItem(rotulo, tipo)
+        rotulo = QLabel(textos.CATEGORIA)
+        rotulo.setBuddy(self.categoria)
+        formulario.addWidget(rotulo)
+        formulario.addWidget(self.categoria)
         self.perfil = QComboBox()
         self.perfil.setItemDelegate(OpcaoCompacta(self.perfil))
         rotulo = QLabel(textos.FORMATO)
@@ -241,9 +317,9 @@ class JanelaPrincipal(QMainWindow):
         self.botao_converter.setEnabled(False)
         self.botao_converter.clicked.connect(self.converter_solicitado.emit)
         formulario.addWidget(self.botao_converter)
-        ajuda = QLabel(textos.AJUDA)
-        ajuda.setWordWrap(True)
-        formulario.addWidget(ajuda)
+        self.ajuda = QLabel(textos.AJUDA)
+        self.ajuda.setWordWrap(True)
+        formulario.addWidget(self.ajuda)
         formulario.addStretch()
         layout.addStretch()
         self.definir_tema(False)
@@ -268,11 +344,18 @@ class JanelaPrincipal(QMainWindow):
         ))
         cor = app.palette().color(QPalette.ColorRole.ButtonText)
         self.alternador_tema.atualizar_icones(cor)
+        for indice, dados in enumerate(self.icones_categoria):
+            self.categoria.setItemIcon(indice, _icone_svg(dados, cor))
 
     def mostrar_entrada(self, arquivo):
         self.entrada.setText(Path(arquivo).name)
         self.entrada.setToolTip(str(arquivo))
-        self.botao_converter.setEnabled(True)
+
+    def atualizar_disponibilidade(self, tem_entrada):
+        disponivel = self.perfil.count() > 0
+        self.perfil.setEnabled(disponivel)
+        self.botao_converter.setEnabled(tem_entrada and disponivel)
+        self.ajuda.setText(textos.AJUDA if disponivel else textos.CATEGORIA_INDISPONIVEL)
 
     def definir_ocupada(self, ocupada):
         self.ocupada = ocupada
@@ -280,9 +363,7 @@ class JanelaPrincipal(QMainWindow):
         self.menuBar().setEnabled(not ocupada)
 
     def escolher_entrada(self, filtro):
-        return QFileDialog.getOpenFileName(
-            self, textos.ABRIR, "", filtro, options=self.opcoes_dialogo,
-        )[0]
+        return QFileDialog.getOpenFileName(self, textos.ABRIR, "", filtro)[0]
 
     def escolher_saida(self, sugestao, filtro):
         return QFileDialog.getSaveFileName(

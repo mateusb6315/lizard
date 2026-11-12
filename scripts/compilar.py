@@ -34,6 +34,8 @@ RECURSOS = (
     "resources/name_dark.png",
     "resources/sun.svg",
     "resources/moon.svg",
+    "resources/video.svg",
+    "resources/music.svg",
     "resources/LICENSE-Lucide.txt",
 ) + tuple(
     f"{PASTA_FFMPEG}/{nome}" for nome in (*BINARIOS_FFMPEG, "LICENSE", "COPYING.LGPLv3", "ORIGEM.md")

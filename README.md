@@ -46,8 +46,8 @@ O Lizard inspeciona as faixas da entrada e avalia a cópia para cada faixa selec
 
 1. Extraia a pasta portátil `lizard-converter-<versão>` para um local com permissão de gravação e abra `Lizard.exe`.
 2. Arraste a mídia para a janela ou selecione **Arquivo → Abrir**. O nome exibido na janela identifica o arquivo carregado.
-3. Escolha um **Formato de saída**. Para extrair o áudio de um MP4 com uma única faixa sonora, selecione **Audio — MP3**. Para manter o vídeo, escolha um perfil de vídeo.
-4. Clique em **Converter** e escolha um nome de arquivo que ainda não exista. A janela de progresso mostra a etapa e o tempo decorrido. Use **Cancelar** se quiser interromper a operação.
+3. Escolha **Vídeo** ou **Áudio** em **Tipo de saída**. O seletor **Formato de saída** lista os formatos desse tipo. Para extrair áudio de um MP4, escolha **Áudio → MP3**.
+4. Clique em **Converter** e escolha um novo nome de arquivo. Quando a janela **Faixas de saída** aparecer, revise as faixas e os avisos e clique em **Continuar**. O progresso mostra a etapa e o tempo decorrido. Use **Cancelar** para interromper a operação.
 5. Após a confirmação, abra o arquivo no destino escolhido. No exemplo do MP3, o resultado contém apenas a faixa de áudio.
 
 Ao mover o aplicativo para outro local, leve a pasta portátil inteira. O executável usa os catálogos, as bibliotecas e as ferramentas que ficam nas pastas ao seu lado.
@@ -72,15 +72,15 @@ Na execução pelo código-fonte, coloque os executáveis e as DLLs em `tools/ff
 | [`interface/`](interface/) | Componentes, textos, temas e controlador que conecta a janela ao serviço. |
 | [`services/`](services/) | Carregamento dos catálogos, inspeção, planejamento, conversão e validação da saída. |
 | [`data/formatos/`](data/formatos/) | Perfis de áudio e vídeo em JSON, com extensões e codecs candidatos. |
-| [`resources/`](resources/) | Marca, ícones dos temas e ícone do executável. |
+| [`resources/`](resources/) | Marca, ícones dos temas e tipos de saída, e ícone do executável. |
 | [`tools/`](tools/) | Executáveis de mídia e informações de origem e licença. |
 | [`scripts/`](scripts/) e [`tests/`](tests/) | Empacotamento para Windows e verificações do aplicativo. |
 
 ### Como a conversão funciona
 
 1. O controlador reúne a entrada, o perfil escolhido e o destino e chama o serviço em uma thread de trabalho. A janela recebe atualizações de etapa enquanto a tarefa roda.
-2. O serviço consulta o FFprobe e mapeia as faixas aplicáveis. Os catálogos indicam candidatos à cópia. O serviço testa a compatibilidade no contêiner de destino e monta os argumentos de cópia ou recodificação por faixa.
-3. O FFmpeg escreve em um diretório temporário dentro da pasta de saída. O serviço usa o FFprobe para conferir a quantidade e os tipos das faixas e os codecs das faixas copiadas. Só então disponibiliza o arquivo no caminho escolhido.
+2. O serviço consulta o FFprobe, disponibiliza as faixas elegíveis para revisão e mapeia as faixas selecionadas. Os catálogos indicam candidatos à cópia. O serviço testa a compatibilidade no contêiner de destino e monta os argumentos por faixa.
+3. O FFmpeg escreve em um diretório temporário dentro da pasta de saída. O serviço usa o FFprobe para conferir a quantidade, os tipos e os codecs das faixas, além dos canais e da duração do áudio quando disponíveis. Só então disponibiliza o arquivo no caminho escolhido.
 
 ### Executar pelo código-fonte
 
@@ -115,9 +115,9 @@ O script confere os hashes dos binários, testa a inicialização e reúne as de
 
 Escolha uma pasta gravável com espaço para a saída e os arquivos temporários da conversão. O aplicativo exige um novo caminho de saída e preserva a entrada. O tamanho final depende da mídia, do destino e das faixas que precisarem ser recodificadas.
 
-O destino também define quantas faixas cabem no arquivo. Para uma entrada com múltiplos áudios, use um perfil adequado, como MKV para vídeo ou MKA para áudio. A seleção automática inclui as faixas de áudio e vídeo aplicáveis ao perfil. Legendas, capas anexadas e outros anexos ficam fora dessa seleção.
+O destino define quantas faixas cabem no arquivo. Se você escolher MP3 para uma entrada com vários áudios, selecione uma faixa. Para preservar várias, use um formato compatível, como MKV para vídeo ou MKA para áudio. A revisão de faixas informa quando legendas, capas ou anexos ficarão fora do resultado.
 
-O processamento de mídia ocorre no computador. No pacote portátil, a preferência de tema é gravada em `data/preferences.json` no fechamento normal. Para preservar essa escolha ao mover a pasta do aplicativo, leve o arquivo de preferências junto.
+O processamento de mídia ocorre no computador. No pacote portátil, a preferência de tema é gravada em `data/preferences.json` no fechamento normal. Para preservar essa escolha ao mover a pasta do aplicativo, leve o arquivo de preferências junto. Em instalações Windows, cada usuário tem sua preferência em `%LOCALAPPDATA%\LizardConverter\preferences.json`.
 
 ## Licença e contribuições
 

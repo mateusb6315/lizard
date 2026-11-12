@@ -46,8 +46,8 @@ Lizard inspects the input streams and evaluates whether each selected stream can
 
 1. Extract the portable `lizard-converter-<version>` folder to a writable location and open `Lizard.exe`.
 2. Drag a media file into the window or choose **Arquivo → Abrir** (File → Open). The name displayed in the window identifies the loaded file.
-3. Choose an output format in **Formato de saída**. To extract audio from an MP4 with a single audio stream, select **Audio — MP3**. Choose a video profile to keep the video.
-4. Click **Converter** (Convert) and choose a file name that does not already exist. The progress window shows the current stage and elapsed time. Use **Cancelar** (Cancel) to stop the operation.
+3. Choose **Vídeo** (Video) or **Áudio** (Audio) under **Tipo de saída** (Output type). **Formato de saída** (Output format) lists formats of that type. To extract audio from an MP4, choose **Áudio → MP3**.
+4. Click **Converter** (Convert) and choose a new file name. When **Faixas de saída** (Output tracks) appears, review the tracks and notices and click **Continuar** (Continue). The progress window shows the current stage and elapsed time. Use **Cancelar** (Cancel) to stop the operation.
 5. After the app confirms completion, open the file at the selected destination. In the MP3 example, the result contains only the audio stream.
 
 Move the entire portable folder when relocating the app. The executable uses the catalogs, libraries, and tools in the folders next to it.
@@ -72,15 +72,15 @@ When running from source, place the executables and DLLs in `tools/ffmpeg/` at t
 | [`interface/`](interface/) | Components, text, themes, and the controller that connects the window to the service. |
 | [`services/`](services/) | Catalog loading, inspection, planning, conversion, and output validation. |
 | [`data/formatos/`](data/formatos/) | JSON profiles for audio and video with extensions and candidate codecs. |
-| [`resources/`](resources/) | Branding, theme icons, and the executable icon. |
+| [`resources/`](resources/) | Branding, theme and output type icons, and the executable icon. |
 | [`tools/`](tools/) | Media executables and their provenance and license information. |
 | [`scripts/`](scripts/) and [`tests/`](tests/) | Windows packaging and application tests. |
 
 ### How conversion works
 
 1. The controller gathers the input, selected profile, and destination and calls the service in a worker thread. The window receives stage updates while the task runs.
-2. The service queries FFprobe and maps the applicable streams. The catalogs identify candidates for copying. The service tests compatibility with the destination container and builds the copy or re-encoding arguments for each stream.
-3. FFmpeg writes to a temporary directory inside the output folder. The service uses FFprobe to check stream counts, stream types, and the codecs of copied streams. It then makes the file available at the selected path.
+2. The service queries FFprobe, makes eligible tracks available for review, and maps the selected tracks. The catalogs identify candidates for copying. The service tests compatibility with the destination container and builds the arguments for each stream.
+3. FFmpeg writes to a temporary directory inside the output folder. The service uses FFprobe to check stream counts, types and codecs, plus audio channels and duration when available. It then makes the file available at the selected path.
 
 ### Run from source
 
@@ -115,9 +115,9 @@ The script verifies the binary hashes, tests startup, and collects dependencies 
 
 Choose a writable folder with room for both the output and temporary conversion files. The app requires a new output path and preserves the input. The final file size depends on the media, destination, and streams that need to be re-encoded.
 
-The destination also determines how many streams the file can hold. For an input with multiple audio streams, use a suitable profile such as MKV for video or MKA for audio. Automatic selection includes the audio and video streams applicable to the profile. It leaves out subtitles, attached cover art, and other attachments.
+The destination determines how many tracks the file can hold. If you choose MP3 for an input with multiple audio tracks, select one track. To retain several, choose a compatible format such as MKV for video or MKA for audio. The track review indicates when subtitles, cover art or attachments will be omitted.
 
-Media processing takes place on your computer. In the portable package, the theme preference is written to `data/preferences.json` when the app closes normally. To keep that choice when moving the app folder, take the preferences file with it.
+Media processing takes place on your computer. The portable app writes its theme preference to `data/preferences.json` when it closes normally. To keep that choice when moving the app folder, take the preferences file with it. On Windows installations, each user's theme preference is stored in `%LOCALAPPDATA%\LizardConverter\preferences.json`.
 
 ## License and contributions
 

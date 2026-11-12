@@ -21,6 +21,8 @@ def carregar_formatos():
                 catalogo = json.load(arquivo)
         except FileNotFoundError as erro:
             raise FileNotFoundError(f"Catálogo de formatos ausente: {caminho}") from erro
+        except PermissionError as erro:
+            raise PermissionError(f"Sem permissão para ler o catálogo de formatos: {caminho}") from erro
         except json.JSONDecodeError as erro:
             raise ValueError(
                 f"{caminho}: JSON inválido na linha {erro.lineno}, coluna {erro.colno}"
