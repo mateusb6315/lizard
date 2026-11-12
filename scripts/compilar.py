@@ -204,7 +204,7 @@ def compilar(versao, canal, final, dependencias, hashes):
     return final
 
 
-def main(canal="release"):
+def main(canal="release", apos_compilacao=None):
     parser = argparse.ArgumentParser(description=f"Empacota o {PRODUTO} localmente ({canal}).")
     parser.add_argument("--versao", help="Rótulo livre do pacote. Se omitido, será solicitado.")
     versao = parser.parse_args().versao
@@ -233,6 +233,8 @@ def main(canal="release"):
         return 130
     print(f"[script] Compilação concluída da versão {versao}")
     print(f"[script] Local: {pacote}")
+    if apos_compilacao is not None:
+        return apos_compilacao(pacote)
     return 0
 
 
