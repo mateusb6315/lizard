@@ -21,6 +21,36 @@ class TestSoftware(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_erro_real_de_conversao_exibe_mensagem_curta_e_registra_diagnostico(self):
+        janela = criar_janela()
+        self.addCleanup(janela.close)
+        controlador = janela.controlador
+        self.assertTrue(controlador.ffmpeg.is_file() and controlador.ffprobe.is_file(),
+                        "FFmpeg e FFprobe locais são necessários para este teste completo")
+        with tempfile.TemporaryDirectory() as pasta:
+            entrada = Path(pasta) / "mídia inválida.mkv"
+            entrada.write_bytes(b"arquivo que nao e midia")
+            destino = entrada.with_name("saida.mp4")
+            controlador.selecionar_entrada(entrada)
+            janela.perfil.setCurrentIndex(janela.perfil.findText("MP4"))
+            with (
+                patch.object(janela, "escolher_saida", return_value=str(destino)),
+                patch.object(janela, "exibir_mensagem") as mensagem,
+                self.assertLogs("lizard", level="ERROR") as log,
+            ):
+                janela.botao_converter.click()
+                tarefa = controlador.tarefa
+                self.assertIsNotNone(tarefa)
+                fim = QSignalSpy(tarefa.finished)
+                if not fim:
+                    self.assertTrue(fim.wait(10000))
+                self.app.processEvents()
+                mensagem.assert_called_once_with(textos.ERRO, QMessageBox.Icon.Critical)
+            self.assertIn(str(entrada), log.output[0])
+            self.assertIn("Falha ao inspecionar", log.output[0])
+            self.assertFalse(destino.exists())
+            self.assertFalse(janela.ocupada)
+
     def test_converte_video_para_audio_pela_interface(self):
         app = self.app
         janela = criar_janela()

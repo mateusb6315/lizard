@@ -1,12 +1,10 @@
 """Paleta e ajustes visuais do tema escuro."""
 
 from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QFileDialog
 
 
 LOGO = "logo_dark.png"
 NOME = "name_dark.png"
-OPCOES_DIALOGO = QFileDialog.Option.DontUseNativeDialog
 
 ESTILO = """
 QComboBox, QPushButton { border-color: #625272; }
@@ -30,7 +28,7 @@ QToolButton#botaoTema:focus { border-color: #b795da; }
 """
 
 
-def aplicar_tema(app, estilo_base):
+def aplicar_tema(app):
     paleta = app.style().standardPalette()
     for papel, cor in (
         (QPalette.ColorRole.Window, "#0b0a0e"),
@@ -50,4 +48,3 @@ def aplicar_tema(app, estilo_base):
     for papel in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText):
         paleta.setColor(QPalette.ColorGroup.Disabled, papel, QColor("#a298ae"))
     app.setPalette(paleta)
-    app.setStyleSheet(estilo_base + ESTILO)

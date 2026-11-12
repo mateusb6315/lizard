@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 import tempfile
 import unittest
 from pathlib import Path
@@ -123,6 +124,19 @@ class TestInterface(unittest.TestCase):
             self.janela.acao_abrir.trigger()
         abrir.assert_called_once_with(self.janela, textos.ABRIR, "", self.janela.controlador.filtro_entrada)
 
+    def test_salvar_usa_dialogo_nativo_nos_dois_temas(self):
+        sugestao = Path("mídia convertida.mp4")
+        filtro = "MP4 (*.mp4)"
+        for tema in (0, 1):
+            with self.subTest(tema=tema):
+                self.janela.alternador_tema.grupo.button(tema).click()
+                with patch.object(QFileDialog, "getSaveFileName", return_value=(str(sugestao), filtro)) as salvar:
+                    self.assertEqual(self.janela.escolher_saida(sugestao, filtro), str(sugestao))
+                salvar.assert_called_once_with(
+                    self.janela, textos.SALVAR, str(sugestao), filtro,
+                    options=QFileDialog.Option.DontConfirmOverwrite,
+                )
+
     def test_progresso_exibe_etapa_e_solicita_cancelamento_uma_vez(self):
         dialogo = DialogoProgresso(self.janela)
         sinal = QSignalSpy(dialogo.cancelamento_solicitado)
@@ -222,19 +236,19 @@ class TestInterface(unittest.TestCase):
             self.assertEqual(reaberta.alternador_tema.grupo.checkedId(), 0)
             reaberta.close()
 
-    def test_falha_ao_gravar_tema_exibe_caminho(self):
+    def test_falha_ao_gravar_tema_exibe_aviso_e_registra_caminho(self):
         with tempfile.TemporaryDirectory() as pasta:
             destino = Path(pasta) / "arquivo" / "preferences.json"
             destino.parent.touch()
             janela = JanelaPrincipal(self.janela.recursos)
             Controlador(janela, Path(pasta), destino)
-            with patch.object(janela, "exibir_mensagem") as mensagem:
+            with patch.object(janela, "exibir_mensagem") as mensagem, self.assertLogs("lizard") as log:
                 janela.close()
-            mensagem.assert_called_once_with(
-                textos.PREFERENCIAS_ERRO.format(caminho=destino), QMessageBox.Icon.Warning,
-            )
+            mensagem.assert_called_once_with(textos.PREFERENCIAS_ERRO, QMessageBox.Icon.Warning)
+            self.assertIn(str(destino), log.output[0])
+            self.assertNotIn(str(destino), mensagem.call_args.args[0])
 
-    def test_inicio_informa_erro_de_catalogo_no_dialogo(self):
+    def test_inicio_exibe_erro_generico_de_catalogo_e_registra_detalhes(self):
         with tempfile.TemporaryDirectory() as pasta:
             catalogo = Path(pasta) / "video.json"
             for conteudo, esperado in (
@@ -250,6 +264,7 @@ class TestInterface(unittest.TestCase):
                         patch("services.metadados.METADADOS", catalogo.parent),
                         patch.object(aplicativo, "QApplication", return_value=self.app),
                         patch.object(QMessageBox, "exec", lambda caixa: exibidas.append(caixa.text())),
+                        self.assertLogs("lizard") as log,
                     ):
                         if isinstance(conteudo, PermissionError):
                             with patch.object(Path, "open", side_effect=conteudo):
@@ -257,6 +272,26 @@ class TestInterface(unittest.TestCase):
                         else:
                             self.assertEqual(aplicativo.main(), 1)
                     mensagem, = exibidas
-                    self.assertIn("Não foi possível carregar os formatos", mensagem)
-                    self.assertIn(str(catalogo), mensagem)
-                    self.assertIn(esperado, mensagem)
+                    self.assertEqual(mensagem, textos.CATALOGOS_ERRO)
+                    self.assertNotIn(str(catalogo), mensagem)
+                    self.assertNotIn(esperado, mensagem)
+                    self.assertIn(str(catalogo), log.output[0])
+                    self.assertIn(esperado, log.output[0])
+
+    def test_configura_log_local_em_utf8(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            logger = logging.Logger("teste-lizard")
+            with (
+                patch.object(aplicativo.QStandardPaths, "writableLocation", return_value=pasta),
+                patch.object(aplicativo.logging, "getLogger", return_value=logger),
+            ):
+                aplicativo.configurar_log()
+                aplicativo.configurar_log()
+            try:
+                self.assertEqual(len(logger.handlers), 1)
+                logger.error("Falha ao converter a faixa de áudio")
+                log = Path(pasta) / textos.TITULO / "lizard.log"
+                self.assertIn("Falha ao converter a faixa de áudio", log.read_text(encoding="utf-8"))
+            finally:
+                for handler in logger.handlers:
+                    handler.close()

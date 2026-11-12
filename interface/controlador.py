@@ -1,6 +1,7 @@
 # controlador intermediário entre a interface e os serviços. é sua única responsabilidade, seguindo o padrão SRP
 
 import json
+import logging
 from pathlib import Path
 from threading import Event
 
@@ -11,6 +12,9 @@ from interface import textos
 from interface.componentes import DialogoFaixas, DialogoProgresso
 from services import conversor
 from services.metadados import carregar_formatos
+
+
+LOG = logging.getLogger("lizard")
 
 
 class ConversaoEmSegundoPlano(QThread):
@@ -27,6 +31,7 @@ class ConversaoEmSegundoPlano(QThread):
         self.saida = None
         self.erro = None
         self.avisos = []
+        self.inicio_ts_recuperado = False
 
     def run(self):
         try:
@@ -34,11 +39,16 @@ class ConversaoEmSegundoPlano(QThread):
                 *self.argumentos, cancelamento=self.cancelamento,
                 informar_etapa=self.etapa_alterada.emit, avisar=self.avisos.append,
                 catalogos=self.catalogos, selecionar_faixas=self.revisar_faixas,
+                avisar_inicio_ts=self.avisar_inicio_ts,
             )
         except conversor.ConversaoCancelada:
             pass
         except Exception as erro:
             self.erro = erro
+
+    def avisar_inicio_ts(self, diagnostico):
+        self.inicio_ts_recuperado = True
+        LOG.warning("Início de TS recuperado em %s\n%s", self.argumentos[0], diagnostico)
 
     def revisar_faixas(self, faixas, omitidas, faixa_unica):
         if len(faixas) == 1 and not omitidas:
@@ -104,14 +114,14 @@ class Controlador(QObject):
             self.preferencias.parent.mkdir(parents=True, exist_ok=True)
             arquivo = QSaveFile(str(self.preferencias))
             conteudo = (json.dumps({"theme": tema}) + "\n").encode("utf-8")
-            if arquivo.open(QIODevice.OpenModeFlag.WriteOnly):
-                if arquivo.write(conteudo) == len(conteudo) and arquivo.commit():
-                    return
-                arquivo.cancelWriting()
+            if arquivo.open(QIODevice.OpenModeFlag.WriteOnly) and (
+                arquivo.write(conteudo) == len(conteudo) and arquivo.commit()
+            ):
+                return
+            LOG.error("Falha ao gravar o tema em %s: %s", self.preferencias, arquivo.errorString())
         except OSError:
-            pass
-        mensagem = textos.PREFERENCIAS_ERRO.format(caminho=self.preferencias)
-        self.janela.exibir_mensagem(mensagem, QMessageBox.Icon.Warning)
+            LOG.exception("Falha ao gravar o tema em %s", self.preferencias)
+        self.janela.exibir_mensagem(textos.PREFERENCIAS_ERRO, QMessageBox.Icon.Warning)
 
     def abrir(self):
         arquivo = self.janela.escolher_entrada(self.filtro_entrada)
@@ -123,6 +133,7 @@ class Controlador(QObject):
             return
         entrada = Path(arquivo)
         if not entrada.is_file() or entrada.suffix.lower() not in self.extensoes:
+            LOG.warning("Entrada ausente ou fora do filtro de formatos: %s", entrada)
             self.janela.exibir_mensagem(textos.ENTRADA_INVALIDA, QMessageBox.Icon.Warning)
             return
         self.entrada = entrada
@@ -133,6 +144,7 @@ class Controlador(QObject):
         if self.entrada is None or self.tarefa is not None:
             return
         if not self.ffmpeg.is_file() or not self.ffprobe.is_file():
+            LOG.error("Ferramenta ausente. FFmpeg: %s. FFprobe: %s", self.ffmpeg, self.ffprobe)
             self.janela.exibir_mensagem(textos.FERRAMENTA_AUSENTE, QMessageBox.Icon.Critical)
             return
         perfil = self.janela.perfil.currentData()
@@ -147,9 +159,9 @@ class Controlador(QObject):
         saida = Path(arquivo)
         if not saida.suffix:
             saida = saida.with_suffix(f".{extensao}")
-        if saida.suffix.lower() != f".{extensao.lower()}" or saida.exists():
-            mensagem = textos.SAIDA_INVALIDA.format(extensao=extensao)
-            self.janela.exibir_mensagem(mensagem, QMessageBox.Icon.Warning)
+        if saida.suffix.lower() != f".{extensao.lower()}" or saida.exists() or saida.is_symlink():
+            LOG.warning("Destino já ocupado ou extensão diferente de .%s: %s", extensao, saida)
+            self.janela.exibir_mensagem(textos.SAIDA_INVALIDA, QMessageBox.Icon.Warning)
             return
         self.tarefa = ConversaoEmSegundoPlano(
             self, self.entrada, saida, categoria, formato, self.ffmpeg, self.ffprobe, self.catalogos,
@@ -189,8 +201,13 @@ class Controlador(QObject):
         self.progresso.deleteLater()
         self.progresso = None
         self.janela.definir_ocupada(False)
+        entrada, saida, categoria, formato = tarefa.argumentos[:4]
+        for aviso in tarefa.avisos:
+            LOG.warning("Conversão de %s para %s (%s/%s): %s", entrada, saida, categoria, formato, aviso)
         if tarefa.erro is not None:
-            mensagem = textos.ERRO.format(motivo=tarefa.erro)
+            LOG.error("Falha na conversão de %s para %s (%s/%s): %s",
+                      entrada, saida, categoria, formato, tarefa.erro)
+            mensagem = textos.ERRO
             icone = QMessageBox.Icon.Critical
         elif tarefa.saida is None:
             mensagem = textos.CANCELADO
@@ -198,9 +215,11 @@ class Controlador(QObject):
         else:
             mensagem = textos.SUCESSO.format(saida=tarefa.saida)
             icone = QMessageBox.Icon.Information
-        if tarefa.avisos:
-            mensagem += "\n\n" + "\n\n".join(tarefa.avisos)
-            if icone == QMessageBox.Icon.Information:
+            if tarefa.avisos or tarefa.inicio_ts_recuperado:
                 icone = QMessageBox.Icon.Warning
+            if tarefa.avisos:
+                mensagem += "\n\n" + textos.AVISO_RECODIFICACAO
+            if tarefa.inicio_ts_recuperado:
+                mensagem += "\n\n" + textos.AVISO_INICIO_TS
         tarefa.deleteLater()
         self.janela.exibir_mensagem(mensagem, icone)

@@ -30,6 +30,143 @@ class TestCancelamento(unittest.TestCase):
 
 @unittest.skipUnless(FFMPEG.is_file() and FFPROBE.is_file(), "FFmpeg e FFprobe locais ausentes")
 class TestIntegracaoConversor(unittest.TestCase):
+    def test_ts_com_inicio_sem_quadro_chave_gera_mkv_decodificavel(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            completo = pasta / "gravacao.ts"
+            entrada = pasta / "gravação cortada.ts"
+            saida = pasta / "recuperada.mkv"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i",
+                 "testsrc2=size=176x144:rate=25:duration=3", "-f", "lavfi", "-i",
+                 "sine=sample_rate=48000:duration=3", "-c:v", "libopenh264", "-g", "25",
+                 "-c:a", "aac", str(completo)], check=True, capture_output=True,
+            )
+            entrada.write_bytes(completo.read_bytes()[188 * 50:])
+            with self.assertRaisesRegex(RuntimeError, "non-existing PPS"):
+                inspecionar_arquivo(entrada, FFPROBE)
+            avisos = []
+            converter(entrada, saida, "video", "mkv", None, FFMPEG, FFPROBE, avisar_inicio_ts=avisos.append)
+            self.assertEqual(len(avisos), 1)
+            self.assertIn("no frame!", avisos[0])
+            faixas = inspecionar_arquivo(saida, FFPROBE)
+            self.assertEqual([s["codec_name"] for s in faixas], ["h264", "aac"])
+            decodificacao = subprocess.run(
+                [str(FFMPEG), "-v", "error", "-xerror", "-i", str(saida), "-map", "0:v",
+                 "-map", "0:a", "-f", "null", "-"], check=True, capture_output=True,
+            )
+            self.assertEqual(decodificacao.stderr, b"")
+            self.assertEqual(list(pasta.glob(".blackberry-*")), [])
+
+    def test_ts_para_vob_preserva_audio_com_duracoes_estimadas_diferentes(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "entrada.ts"
+            saida = pasta / "saida.vob"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i",
+                 "testsrc2=size=176x144:rate=25:duration=1.5", "-f", "lavfi", "-i",
+                 "sine=sample_rate=48000:duration=1.5", "-c:v", "libopenh264",
+                 "-c:a", "aac", str(entrada)], check=True, capture_output=True,
+            )
+            converter(entrada, saida, "video", "vob", None, FFMPEG, FFPROBE)
+            original = inspecionar_arquivo(entrada, FFPROBE)[1]
+            convertido = inspecionar_arquivo(saida, FFPROBE)[1]
+            self.assertEqual(convertido["codec_name"], "ac3")
+            self.assertGreater(abs(float(original["duration"]) - float(convertido["duration"])), 0.25)
+            tamanhos = []
+            for arquivo in (entrada, saida):
+                pcm = subprocess.run(
+                    [str(FFMPEG), "-v", "error", "-xerror", "-i", str(arquivo), "-map", "0:a",
+                     "-c:a", "pcm_s16le", "-f", "s16le", "-"], check=True, capture_output=True,
+                ).stdout
+                tamanhos.append(len(pcm))
+            self.assertGreater(tamanhos[0], 100_000)
+            self.assertAlmostEqual(*tamanhos, delta=2 * 1536)
+
+    def test_mkv_com_capitulos_copia_faixas_para_mp4_e_m4a(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "capítulos.mkv"
+            metadados = pasta / "capitulos.txt"
+            metadados.write_text(
+                ";FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=900\ntitle=Capitulo\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i",
+                 "testsrc2=size=176x144:rate=25:duration=1", "-f", "lavfi", "-i",
+                 "sine=sample_rate=48000:duration=1", "-f", "ffmetadata", "-i", str(metadados),
+                 "-map", "0:v", "-map", "1:a", "-map_chapters", "2", "-c:v", "libopenh264",
+                 "-c:a", "aac", str(entrada)], check=True, capture_output=True,
+            )
+            for categoria, formato, esperados in (
+                ("video", "mp4", ["h264", "aac", "bin_data"]), ("audio", "m4a", ["aac", "bin_data"]),
+            ):
+                with self.subTest(formato=formato):
+                    saida = pasta / f"saida.{formato}"
+                    avisos = []
+                    converter(entrada, saida, categoria, formato, None, FFMPEG, FFPROBE, avisar=avisos.append)
+                    dados = inspecionar_arquivo(saida, FFPROBE, detalhes=True)
+                    self.assertEqual([s["codec_name"] for s in dados["streams"]], esperados)
+                    self.assertEqual(dados["chapters"][0]["tags"]["title"], "Capitulo")
+                    self.assertEqual(avisos, [])
+
+    def test_mkv_h264_para_avi_copia_video_com_filtro_de_pacotes(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "avc.mkv"
+            saida = pasta / "video.avi"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i",
+                 "testsrc2=size=176x144:rate=25:duration=0.6", "-c:v", "libopenh264", str(entrada)],
+                check=True, capture_output=True,
+            )
+            self.assertEqual(inspecionar_arquivo(entrada, FFPROBE)[0]["is_avc"], "true")
+            converter(entrada, saida, "video", "avi", None, FFMPEG, FFPROBE)
+            self.assertEqual(inspecionar_arquivo(saida, FFPROBE)[0]["codec_name"], "h264")
+            hashes = [
+                subprocess.run(
+                    [str(FFMPEG), "-v", "error", "-xerror", "-i", str(arquivo), "-map", "0:v",
+                     "-f", "hash", "-"], check=True, capture_output=True,
+                ).stdout
+                for arquivo in (entrada, saida)
+            ]
+            self.assertEqual(*hashes)
+
+    def test_mkv_com_dts_repetido_para_mp4_recodifica_so_o_video(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            pasta = Path(pasta)
+            entrada = pasta / "DTS repetido.mkv"
+            saida = pasta / "convertido.mp4"
+            filtros = r"setts=pts=if(eq(N\,8)\,PREV_OUTPTS\,PTS):dts=if(eq(N\,8)\,PREV_OUTDTS\,DTS)"
+            subprocess.run(
+                [str(FFMPEG), "-v", "error", "-f", "lavfi", "-i",
+                 "testsrc2=size=176x144:rate=25:duration=1", "-f", "lavfi", "-i",
+                 "sine=duration=1", "-c:v", "mpeg4", "-c:a", "aac", "-bsf:v", filtros, str(entrada)],
+                check=True, capture_output=True,
+            )
+            copia = subprocess.run(
+                [str(FFMPEG), "-v", "error", "-xerror", "-i", str(entrada), "-c", "copy",
+                 str(pasta / "copia direta.mp4")], capture_output=True,
+            )
+            self.assertNotEqual(copia.returncode, 0)
+            self.assertIn(b"Non-monotonic DTS", copia.stderr)
+            self.assertIn(b"Error muxing a packet", copia.stderr)
+            avisos = []
+            converter(entrada, saida, "video", "mp4", None, FFMPEG, FFPROBE, avisar=avisos.append)
+            self.assertEqual(len(avisos), 1)
+            self.assertIn("Cópia da faixa 0 falhou", avisos[0])
+            self.assertEqual([s["codec_name"] for s in inspecionar_arquivo(saida, FFPROBE)], ["h264", "aac"])
+            hashes_audio = [
+                subprocess.run(
+                    [str(FFMPEG), "-v", "error", "-i", str(arquivo), "-map", "0:a", "-c", "copy",
+                     "-f", "hash", "-"], check=True, capture_output=True,
+                ).stdout
+                for arquivo in (entrada, saida)
+            ]
+            self.assertEqual(*hashes_audio)
+
     def test_recodifica_aac_para_mp3_sem_colidir_com_sondagem(self):
         with tempfile.TemporaryDirectory() as pasta:
             pasta = Path(pasta)

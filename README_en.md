@@ -47,7 +47,7 @@ Lizard inspects the input streams and evaluates whether each selected stream can
 1. Extract the portable `lizard-converter-<version>` folder to a writable location and open `Lizard.exe`.
 2. Drag a media file into the window or choose **Arquivo → Abrir** (File → Open). The name displayed in the window identifies the loaded file.
 3. Choose **Vídeo** (Video) or **Áudio** (Audio) under **Tipo de saída** (Output type). **Formato de saída** (Output format) lists formats of that type. To extract audio from an MP4, choose **Áudio → MP3**.
-4. Click **Converter** (Convert) and choose a new file name. When **Faixas de saída** (Output tracks) appears, review the tracks and notices and click **Continuar** (Continue). The progress window shows the current stage and elapsed time. Use **Cancelar** (Cancel) to stop the operation.
+4. Click **Converter** (Convert) and choose a new file name in the Windows save dialog. When **Faixas de saída** (Output tracks) appears, review the tracks and notices and click **Continuar** (Continue). The progress window shows the current stage and elapsed time. Use **Cancelar** (Cancel) to stop the operation.
 5. After the app confirms completion, open the file at the selected destination. In the MP3 example, the result contains only the audio stream.
 
 Move the entire portable folder when relocating the app. The executable uses the catalogs, libraries, and tools in the folders next to it.
@@ -118,6 +118,8 @@ Choose a writable folder with room for both the output and temporary conversion 
 The destination determines how many tracks the file can hold. If you choose MP3 for an input with multiple audio tracks, select one track. To retain several, choose a compatible format such as MKV for video or MKA for audio. The track review indicates when subtitles, cover art or attachments will be omitted.
 
 Media processing takes place on your computer. The portable app writes its theme preference to `data/preferences.json` when it closes normally. To keep that choice when moving the app folder, take the preferences file with it. On Windows installations, each user's theme preference is stored in `%LOCALAPPDATA%\LizardConverter\preferences.json`.
+
+If an operation fails, the app shows a short message. Technical diagnostics are stored in `%LOCALAPPDATA%\LizardConverter\lizard.log`. The log may include the names and paths of files used in the operation.
 
 ## License and contributions
 

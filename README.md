@@ -47,7 +47,7 @@ O Lizard inspeciona as faixas da entrada e avalia a cópia para cada faixa selec
 1. Extraia a pasta portátil `lizard-converter-<versão>` para um local com permissão de gravação e abra `Lizard.exe`.
 2. Arraste a mídia para a janela ou selecione **Arquivo → Abrir**. O nome exibido na janela identifica o arquivo carregado.
 3. Escolha **Vídeo** ou **Áudio** em **Tipo de saída**. O seletor **Formato de saída** lista os formatos desse tipo. Para extrair áudio de um MP4, escolha **Áudio → MP3**.
-4. Clique em **Converter** e escolha um novo nome de arquivo. Quando a janela **Faixas de saída** aparecer, revise as faixas e os avisos e clique em **Continuar**. O progresso mostra a etapa e o tempo decorrido. Use **Cancelar** para interromper a operação.
+4. Clique em **Converter** e escolha um novo nome de arquivo no diálogo do Windows. Quando a janela **Faixas de saída** aparecer, revise as faixas e os avisos e clique em **Continuar**. O progresso mostra a etapa e o tempo decorrido. Use **Cancelar** para interromper a operação.
 5. Após a confirmação, abra o arquivo no destino escolhido. No exemplo do MP3, o resultado contém apenas a faixa de áudio.
 
 Ao mover o aplicativo para outro local, leve a pasta portátil inteira. O executável usa os catálogos, as bibliotecas e as ferramentas que ficam nas pastas ao seu lado.
@@ -118,6 +118,8 @@ Escolha uma pasta gravável com espaço para a saída e os arquivos temporários
 O destino define quantas faixas cabem no arquivo. Se você escolher MP3 para uma entrada com vários áudios, selecione uma faixa. Para preservar várias, use um formato compatível, como MKV para vídeo ou MKA para áudio. A revisão de faixas informa quando legendas, capas ou anexos ficarão fora do resultado.
 
 O processamento de mídia ocorre no computador. No pacote portátil, a preferência de tema é gravada em `data/preferences.json` no fechamento normal. Para preservar essa escolha ao mover a pasta do aplicativo, leve o arquivo de preferências junto. Em instalações Windows, cada usuário tem sua preferência em `%LOCALAPPDATA%\LizardConverter\preferences.json`.
+
+Se uma operação falhar, a janela mostra uma mensagem curta. O diagnóstico técnico fica em `%LOCALAPPDATA%\LizardConverter\lizard.log`. O log pode incluir os nomes e caminhos dos arquivos usados na operação.
 
 ## Licença e contribuições
 

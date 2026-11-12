@@ -55,7 +55,6 @@ def aplicar_tema(app):
     ):
         paleta.setColor(papel, QColor(cor))
     app.setPalette(paleta)
-    app.setStyleSheet(ESTILO)
 
 
 def _icone_svg(dados, cor):
@@ -327,13 +326,12 @@ class JanelaPrincipal(QMainWindow):
     def definir_tema(self, escuro):
         app = QApplication.instance()
         if escuro:
-            dark.aplicar_tema(app, ESTILO)
+            dark.aplicar_tema(app)
             tema = dark
-            self.opcoes_dialogo = dark.OPCOES_DIALOGO
         else:
             aplicar_tema(app)
             tema = default
-            self.opcoes_dialogo = QFileDialog.Option(0)
+        self.setStyleSheet(ESTILO + dark.ESTILO if escuro else ESTILO)
         caminho_logo = str(self.recursos / tema.LOGO)
         self.setWindowIcon(QIcon(caminho_logo))
         self.logo.setPixmap(QPixmap(caminho_logo).scaled(
@@ -368,7 +366,7 @@ class JanelaPrincipal(QMainWindow):
     def escolher_saida(self, sugestao, filtro):
         return QFileDialog.getSaveFileName(
             self, textos.SALVAR, str(sugestao), filtro,
-            options=self.opcoes_dialogo | QFileDialog.Option.DontConfirmOverwrite,
+            options=QFileDialog.Option.DontConfirmOverwrite,
         )[0]
 
     def exibir_mensagem(self, mensagem, icone=QMessageBox.Icon.Information):

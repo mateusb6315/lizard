@@ -11,6 +11,7 @@ O nome comercial é **LizardConverter**. O build portátil para Windows x64 entr
 ## Decisões do produto
 
 - Os catálogos são lidos na inicialização e declaram candidatos à cópia. O serviço oferece ao controlador as faixas elegíveis para revisão após o FFprobe. A interface informa as omissões e limita a escolha de faixas nos formatos de áudio de faixa única. O serviço testa as cópias e valida a saída antes de disponibilizá-la em um caminho novo.
+- Uma rejeição de cópia reconhecida permite recodificar a faixa afetada, com aviso. A execução combinada exige que o diagnóstico identifique o índice de saída. As janelas de erro usam mensagens curtas e os diagnósticos ficam em `%LOCALAPPDATA%\LizardConverter\lizard.log`.
 - O pacote portátil grava o tema em `data/preferences.json` no fechamento normal. Em Program Files ou em instalações reconhecidas do Inno Setup, a preferência fica em `%LOCALAPPDATA%\LizardConverter\preferences.json` e a leitura inicial pode recuperar o arquivo antigo ao lado do executável. O formato continua `{"theme": "dark"}` ou `{"theme": "default"}`.
 - `docs/` e `temp/` são diretórios locais ignorados pelo Git. `README.md` e `README_en.md` são as referências públicas para uso e contribuição. O arquivo `LICENSE` da raiz contém a Licença MIT do projeto. Os componentes de terceiros seguem os termos que acompanham seus recursos e o pacote.
 
